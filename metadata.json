@@ -1,0 +1,6 @@
+{
+  "name": "EmpoWork",
+  "description": "A Smart Digital Platform for Empowering Daily Labourers to register, find work, track attendance, log wages, resolve disputes, and access skill-development resources.",
+  "requestFramePermissions": ["geolocation", "microphone", "camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

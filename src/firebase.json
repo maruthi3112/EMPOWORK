@@ -1,0 +1,8 @@
+{
+  "firestore": [
+    {
+      "database": "ai-studio-empowork-9b37d8dc-b295-4b94-a96f-29243881245f",
+      "rules": "firestore.rules"
+    }
+  ]
+}

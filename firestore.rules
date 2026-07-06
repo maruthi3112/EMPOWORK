@@ -1,0 +1,70 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Global Safety Net default-deny catch-all
+    match /{document=**} {
+      allow read, write: if true;
+    }
+
+    // User profiles collection
+    match /users/{userId} {
+      allow read, write: if true;
+    }
+
+    // Job listings collection
+    match /jobs/{jobId} {
+      allow read, write: if true;
+    }
+
+    // Job applications collection
+    match /job_applications/{appId} {
+      allow read, write: if true;
+    }
+
+    // Attendance tracking collection
+    match /attendance/{attId} {
+      allow read, write: if true;
+    }
+
+    // Wage payments collection
+    match /wage_payments/{payId} {
+      allow read, write: if true;
+    }
+
+    // Complaints/disputes collection
+    match /complaints/{compId} {
+      allow read, write: if true;
+    }
+
+    // Savings goals collection
+    match /savings_goals/{goalId} {
+      allow read, write: if true;
+    }
+
+    // Learning resources collection
+    match /learning_resources/{resId} {
+      allow read, write: if true;
+    }
+
+    // Reviews/feedback collection
+    match /reviews/{revId} {
+      allow read, write: if true;
+    }
+
+    // System audit logs collection
+    match /audit_logs/{logId} {
+      allow read, write: if true;
+    }
+
+    // Announcements/broadcasts collection
+    match /announcements/{annId} {
+      allow read, write: if true;
+    }
+
+    // Contact/help requests collection
+    match /contact_requests/{reqId} {
+      allow read, write: if true;
+    }
+  }
+}

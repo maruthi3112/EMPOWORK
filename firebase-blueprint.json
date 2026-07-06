@@ -1,0 +1,215 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "User profiles for workers, employers, and admins",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "password": { "type": "string" },
+        "role": { "type": "string" },
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "location": { "type": "string" },
+        "workerType": { "type": "string" },
+        "trade": { "type": "string" },
+        "experience": { "type": "string" },
+        "wageExpectation": { "type": "number" },
+        "bio": { "type": "string" },
+        "skills": { "type": "array" },
+        "companyName": { "type": "string" },
+        "businessType": { "type": "string" },
+        "averageRating": { "type": "number" },
+        "ratingCount": { "type": "number" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["uid", "email", "role", "name"]
+    },
+    "Job": {
+      "title": "Job Listing",
+      "description": "Job listings posted by employers",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "employerId": { "type": "string" },
+        "employerName": { "type": "string" },
+        "title": { "type": "string" },
+        "trade": { "type": "string" },
+        "description": { "type": "string" },
+        "location": { "type": "string" },
+        "wage": { "type": "number" },
+        "startDate": { "type": "string" },
+        "endDate": { "type": "string" },
+        "slots": { "type": "number" },
+        "slotsTaken": { "type": "number" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "employerId", "employerName", "title", "trade", "wage", "slots", "status"]
+    },
+    "JobApplication": {
+      "title": "Job Application",
+      "description": "Applications submitted by workers for job listings",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "jobId": { "type": "string" },
+        "workerId": { "type": "string" },
+        "workerName": { "type": "string" },
+        "workerPhone": { "type": "string" },
+        "employerId": { "type": "string" },
+        "employerName": { "type": "string" },
+        "jobTitle": { "type": "string" },
+        "wage": { "type": "number" },
+        "status": { "type": "string" },
+        "appliedAt": { "type": "string" }
+      },
+      "required": ["id", "jobId", "workerId", "employerId", "status"]
+    },
+    "Attendance": {
+      "title": "Attendance Record",
+      "description": "Attendance clock-in and clock-out logs",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "jobId": { "type": "string" },
+        "jobTitle": { "type": "string" },
+        "workerId": { "type": "string" },
+        "workerName": { "type": "string" },
+        "employerId": { "type": "string" },
+        "checkIn": { "type": "string" },
+        "checkOut": { "type": "string" },
+        "hours": { "type": "number" },
+        "status": { "type": "string" },
+        "wageRate": { "type": "number" }
+      },
+      "required": ["id", "jobId", "workerId", "employerId", "checkIn", "status"]
+    },
+    "WagePayment": {
+      "title": "Wage Payment",
+      "description": "Payments made to workers",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "jobId": { "type": "string" },
+        "jobTitle": { "type": "string" },
+        "workerId": { "type": "string" },
+        "workerName": { "type": "string" },
+        "employerId": { "type": "string" },
+        "employerName": { "type": "string" },
+        "amount": { "type": "number" },
+        "status": { "type": "string" },
+        "paidAt": { "type": "string" },
+        "paymentMethod": { "type": "string" }
+      },
+      "required": ["id", "jobId", "workerId", "employerId", "amount", "status"]
+    },
+    "Complaint": {
+      "title": "Labor Dispute Complaint",
+      "description": "Grievance or dispute complaints raised by workers",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "workerId": { "type": "string" },
+        "workerName": { "type": "string" },
+        "employerId": { "type": "string" },
+        "employerName": { "type": "string" },
+        "jobTitle": { "type": "string" },
+        "issueType": { "type": "string" },
+        "description": { "type": "string" },
+        "status": { "type": "string" },
+        "resolutionNotes": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "resolvedAt": { "type": "string" }
+      },
+      "required": ["id", "workerId", "workerName", "employerId", "issueType", "description", "status", "createdAt"]
+    },
+    "SavingsGoal": {
+      "title": "Savings Goal",
+      "description": "Target savings goals set by workers",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "workerId": { "type": "string" },
+        "title": { "type": "string" },
+        "targetAmount": { "type": "number" },
+        "currentAmount": { "type": "number" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "workerId", "title", "targetAmount", "currentAmount"]
+    },
+    "LearningResource": {
+      "title": "Learning Resource",
+      "description": "Trade training videos or financial literacy guides",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "trade": { "type": "string" },
+        "category": { "type": "string" },
+        "type": { "type": "string" },
+        "link": { "type": "string" },
+        "description": { "type": "string" },
+        "duration": { "type": "string" }
+      },
+      "required": ["id", "title", "trade", "category", "type", "link", "description"]
+    },
+    "Review": {
+      "title": "Worker Feedback Review",
+      "description": "Feedback and star ratings submitted by employers for workers",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "workerId": { "type": "string" },
+        "workerName": { "type": "string" },
+        "employerId": { "type": "string" },
+        "employerName": { "type": "string" },
+        "jobId": { "type": "string" },
+        "jobTitle": { "type": "string" },
+        "rating": { "type": "number" },
+        "comment": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "workerId", "workerName", "employerId", "employerName", "jobId", "rating", "createdAt"]
+    }
+  },
+  "firestore": {
+    "users": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "jobs": {
+      "schema": "Job",
+      "description": "Job listings"
+    },
+    "job_applications": {
+      "schema": "JobApplication",
+      "description": "Job applications"
+    },
+    "attendance": {
+      "schema": "Attendance",
+      "description": "Attendance tracking"
+    },
+    "wage_payments": {
+      "schema": "WagePayment",
+      "description": "Payments history"
+    },
+    "complaints": {
+      "schema": "Complaint",
+      "description": "Dispute complaints"
+    },
+    "savings_goals": {
+      "schema": "SavingsGoal",
+      "description": "Savings goals tracking"
+    },
+    "learning_resources": {
+      "schema": "LearningResource",
+      "description": "Educational assets"
+    },
+    "reviews": {
+      "schema": "Review",
+      "description": "Employer reviews and ratings for workers"
+    }
+  }
+}
