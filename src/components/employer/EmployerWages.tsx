@@ -52,6 +52,29 @@ export default function EmployerWages({
   const totalPaid = paidList.reduce((sum, p) => sum + p.amount, 0);
   const totalPending = pendingList.reduce((sum, p) => sum + p.amount, 0);
 
+  const totalWages = totalPaid + totalPending;
+  const paidPercentage = totalWages > 0 ? (totalPaid / totalWages) * 100 : 0;
+  const pendingPercentage = totalWages > 0 ? (totalPending / totalWages) * 100 : 0;
+
+  const unpaidWorkers = React.useMemo(() => {
+    const map = new Map<string, { name: string; pendingAmount: number; count: number; payment: WagePayment }>();
+    pendingList.forEach(p => {
+      const existing = map.get(p.workerId);
+      if (existing) {
+        existing.pendingAmount += p.amount;
+        existing.count += 1;
+      } else {
+        map.set(p.workerId, {
+          name: p.workerName || "Worker",
+          pendingAmount: p.amount,
+          count: 1,
+          payment: p
+        });
+      }
+    });
+    return Array.from(map.values());
+  }, [pendingList]);
+
   // Filters
   const filteredPayments = wagePayments.filter(p => {
     const workerName = p.workerName || "Worker";
@@ -218,6 +241,159 @@ TRANSACTION HASH ID: ${payment.transactionId || "TXN-SECURE-HANDSHAKE-PENDING"}
           </div>
           <div className="p-2.5 bg-indigo-50 text-indigo-650 rounded-lg"><ShieldCheck className="w-4 h-4" /></div>
         </div>
+      </div>
+
+      {/* Visual Payroll Breakdown & Unpaid Staff Card */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 bg-slate-50 border border-slate-200 rounded-2xl p-6">
+        
+        {/* Visual Chart Column (Col 1 & 2) */}
+        <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 p-5 flex flex-col justify-between space-y-5">
+          <div>
+            <span className="text-[10px] font-black uppercase tracking-wider text-indigo-650">Analytics Visualization</span>
+            <h3 className="font-black text-sm text-slate-900 uppercase tracking-tight mt-0.5">Wage Budget Allocation</h3>
+            <p className="text-[10px] text-slate-500">Proportion of cleared payouts versus outstanding labor liabilities.</p>
+          </div>
+
+          <div className="space-y-4">
+            {/* Dynamic Segmented Progress Bar */}
+            <div className="space-y-1">
+              <div className="flex justify-between text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                <span>Disbursed ({paidPercentage.toFixed(1)}%)</span>
+                <span>Outstanding ({pendingPercentage.toFixed(1)}%)</span>
+              </div>
+              <div className="h-6 w-full rounded-full bg-slate-150 overflow-hidden flex shadow-inner border border-slate-200">
+                {totalWages > 0 ? (
+                  <>
+                    <div 
+                      className="bg-gradient-to-r from-emerald-500 to-emerald-600 transition-all duration-500 flex items-center justify-center text-[10px] font-black text-white" 
+                      style={{ width: `${paidPercentage}%` }}
+                      title={`Paid: ${paidPercentage.toFixed(1)}%`}
+                    >
+                      {paidPercentage > 15 && `₹${totalPaid.toLocaleString()}`}
+                    </div>
+                    <div 
+                      className="bg-gradient-to-r from-amber-500 to-amber-600 transition-all duration-500 flex items-center justify-center text-[10px] font-black text-white" 
+                      style={{ width: `${pendingPercentage}%` }}
+                      title={`Pending: ${pendingPercentage.toFixed(1)}%`}
+                    >
+                      {pendingPercentage > 15 && `₹${totalPending.toLocaleString()}`}
+                    </div>
+                  </>
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-[10px] font-semibold text-slate-400">
+                    No active payroll entries to visualize
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Custom SVG Gauge side-by-side with data details */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-center pt-2">
+              <div className="flex flex-col items-center justify-center bg-slate-50 border border-slate-150 rounded-xl p-3 h-28">
+                <svg width="120" height="70" viewBox="0 0 100 55" className="overflow-visible">
+                  {/* Background Track */}
+                  <path 
+                    d="M 10,50 A 40,40 0 0,1 90,50" 
+                    fill="none" 
+                    stroke="#f1f5f9" 
+                    strokeWidth="10" 
+                    strokeLinecap="round" 
+                  />
+                  {/* Paid portion track */}
+                  {totalWages > 0 && (
+                    <path 
+                      d="M 10,50 A 40,40 0 0,1 90,50" 
+                      fill="none" 
+                      stroke="#10b981" 
+                      strokeWidth="10" 
+                      strokeLinecap="round" 
+                      strokeDasharray="125.6"
+                      strokeDashoffset={125.6 - (125.6 * (paidPercentage / 100))}
+                      className="transition-all duration-700 ease-out"
+                    />
+                  )}
+                  {/* Center Text */}
+                  <text x="50" y="42" textAnchor="middle" className="font-sans font-black text-[11px] fill-slate-900">
+                    {totalWages > 0 ? `${paidPercentage.toFixed(0)}%` : "0%"}
+                  </text>
+                  <text x="50" y="51" textAnchor="middle" className="font-sans font-bold text-[5px] fill-slate-450 uppercase tracking-widest">
+                    Cleared
+                  </text>
+                </svg>
+                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-1">Disbursement Progress Ratio</span>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
+                  <div className="flex items-center space-x-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Cleared Wages</span>
+                  </div>
+                  <span className="text-xs font-black text-slate-900 font-mono">₹{totalPaid.toLocaleString()}</span>
+                </div>
+                <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
+                  <div className="flex items-center space-x-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Pending Wages</span>
+                  </div>
+                  <span className="text-xs font-black text-amber-600 font-mono">₹{totalPending.toLocaleString()}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-slate-400"></span>
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Total Payroll Budget</span>
+                  </div>
+                  <span className="text-xs font-black text-slate-950 font-mono">₹{totalWages.toLocaleString()}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Unpaid Workers Column (Col 3) */}
+        <div className="bg-white rounded-xl border border-slate-200 p-5 flex flex-col justify-between space-y-4">
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-black uppercase tracking-wider text-rose-600">Workforce Status</span>
+              {unpaidWorkers.length > 0 && (
+                <span className="px-2 py-0.5 bg-rose-50 text-rose-600 border border-rose-200 rounded-full text-[9px] font-black uppercase tracking-wider animate-pulse">
+                  Needs Clearance
+                </span>
+              )}
+            </div>
+            <h3 className="font-black text-sm text-slate-900 uppercase tracking-tight mt-0.5">Unpaid Workers Breakdown</h3>
+            <p className="text-[10px] text-slate-500">{unpaidWorkers.length} laborers currently holding pending wage slips.</p>
+          </div>
+
+          <div className="flex-1 overflow-y-auto max-h-[155px] pr-1 space-y-2 scrollbar-thin">
+            {unpaidWorkers.length > 0 ? (
+              unpaidWorkers.map((worker, idx) => (
+                <div key={`unpaid-worker-${worker.payment.workerId || 'anon'}-${worker.name.replace(/\s+/g, '-')}-${idx}`} className="flex items-center justify-between p-2.5 bg-slate-50 hover:bg-slate-100/70 border border-slate-150 rounded-xl transition-all">
+                  <div>
+                    <span className="font-black text-xs text-slate-950 block">{worker.name}</span>
+                    <span className="text-[9px] text-slate-400 font-bold uppercase block">{worker.count} pending {worker.count === 1 ? 'slip' : 'slips'}</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="font-black text-xs text-rose-600 font-mono">₹{worker.pendingAmount.toLocaleString()}</span>
+                    <button
+                      onClick={() => handleInitiatePayment(worker.payment)}
+                      className="px-2.5 py-1 bg-slate-950 hover:bg-slate-850 text-amber-500 rounded-lg text-[9px] font-black uppercase transition-all shadow-xs border border-slate-800 cursor-pointer"
+                    >
+                      Pay
+                    </button>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center py-8 text-center text-slate-400">
+                <CheckCircle className="w-7 h-7 text-emerald-500 mb-1.5" />
+                <span className="text-[10px] font-black uppercase tracking-wider text-emerald-700">All Workers Cleared!</span>
+                <span className="text-[9px] text-slate-400 mt-0.5">No outstanding daily wages pending disbursal.</span>
+              </div>
+            )}
+          </div>
+        </div>
+
       </div>
 
       {/* Main Ledger Grid list */}

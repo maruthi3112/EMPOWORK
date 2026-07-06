@@ -211,6 +211,30 @@ export default function EmployerActivityStream({
       });
     });
 
+    // Generate automated compliance alerts for overdue wages based on logged site attendance
+    const todayStr = new Date().toISOString().split("T")[0];
+    attendanceLogs.forEach(att => {
+      if (att.checkOutTime && att.status !== "rejected" && att.date < todayStr) {
+        const isPaid = wagePayments.some(pay => 
+          pay.status === "paid" && 
+          (pay.id === `wage-${att.id}` || (pay.workerId === att.workerId && pay.jobId === att.jobId && pay.amount === att.wageEarned))
+        );
+        if (!isPaid) {
+          list.push({
+            id: `overdue-alert-${att.id}`,
+            category: "dispute",
+            title: `⚠️ COMPLIANCE ALERT: Overdue Wages for ${att.workerName || "Worker"}`,
+            message: `Wages of ₹${att.wageEarned.toLocaleString()} INR for '${att.jobTitle || "assignment"}' shift on ${att.date} have not been disbursed. Indian Labor Regulations require same-day settlement.`,
+            timestamp: att.date,
+            timeRaw: new Date(`${att.date}T12:00:00`).getTime(),
+            type: "error",
+            workerName: att.workerName,
+            statusBadge: "OVERDUE WAGE"
+          });
+        }
+      }
+    });
+
     // Sort chronologically (newest first)
     return list.sort((a, b) => b.timeRaw - a.timeRaw);
   }, [simulatedLogs, defaultLogs, attendanceLogs, applicants, wagePayments, complaints]);
@@ -331,9 +355,9 @@ export default function EmployerActivityStream({
             </p>
           </div>
         ) : (
-          filteredFeed.map((item) => (
+          filteredFeed.map((item, idx) => (
             <div 
-              key={item.id} 
+              key={`${item.id}-${idx}`} 
               className="p-3 bg-slate-50 hover:bg-slate-100/75 border border-slate-150 rounded-xl transition-all flex items-start gap-3 duration-200 group"
             >
               {/* Category Indicator Icon Ring */}

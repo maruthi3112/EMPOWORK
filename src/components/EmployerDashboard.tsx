@@ -77,6 +77,21 @@ export default function EmployerDashboard({
   const [wagePayments, setWagePayments] = useState<WagePayment[]>([]);
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [userProfiles, setUserProfiles] = useState<Record<string, UserProfile>>({});
+
+  // Calculate Overdue Wages based on logged site attendance
+  const overdueWages = React.useMemo(() => {
+    const todayStr = new Date().toISOString().split("T")[0];
+    return attendanceLogs.filter(att => {
+      if (!att.checkOutTime) return false;
+      if (att.status === "rejected") return false;
+      if (att.date >= todayStr) return false;
+      const isPaid = wagePayments.some(p => 
+        p.status === "paid" && 
+        (p.id === `wage-${att.id}` || (p.workerId === att.workerId && p.jobId === att.jobId && p.amount === att.wageEarned))
+      );
+      return !isPaid;
+    });
+  }, [attendanceLogs, wagePayments]);
   
   // QR Code States
   const [qrJob, setQrJob] = useState<Job | null>(null);
@@ -326,29 +341,33 @@ export default function EmployerDashboard({
         createdAt: new Date().toISOString()
       });
 
-      // Automatically write corresponding pending WagePayment doc to queue disbursal
-      const wageId = `wage-${attendanceId}`;
-      await setDoc(doc(db, "wage_payments", wageId), {
-        id: wageId,
-        workerId: payload.workerId,
-        workerName: payload.workerName,
-        employerId: user.uid,
-        employerName: user.companyName || user.name,
-        jobId: payload.jobId,
-        jobTitle: payload.jobTitle,
-        amount: payload.wageEarned,
-        date: new Date().toISOString().split("T")[0],
-        status: "pending",
-        transactionId: ""
-      });
+      if (payload.checkOutTime) {
+        // Automatically write corresponding pending WagePayment doc to queue disbursal
+        const wageId = `wage-${attendanceId}`;
+        await setDoc(doc(db, "wage_payments", wageId), {
+          id: wageId,
+          workerId: payload.workerId,
+          workerName: payload.workerName,
+          employerId: user.uid,
+          employerName: user.companyName || user.name,
+          jobId: payload.jobId,
+          jobTitle: payload.jobTitle,
+          amount: payload.wageEarned,
+          date: new Date().toISOString().split("T")[0],
+          status: "pending",
+          transactionId: ""
+        });
 
-      // Queue approved wage for automatic processing
-      setAutoPayWageId(wageId);
+        // Queue approved wage for automatic processing
+        setAutoPayWageId(wageId);
 
-      // Redirect to Wages & Payments panel immediately
-      setActiveTab("employer-wages");
+        // Redirect to Wages & Payments panel immediately
+        setActiveTab("employer-wages");
 
-      showToast(`Manual foreman clock-in authorized! Redirecting to disburse ₹${payload.wageEarned} to ${payload.workerName}...`, "success");
+        showToast(`Manual foreman clock-in authorized! Redirecting to disburse ₹${payload.wageEarned} to ${payload.workerName}...`, "success");
+      } else {
+        showToast(`Worker check-in recorded successfully!`, "success");
+      }
     } catch (err: any) {
       showToast(`Error: ${err.message}`, "error");
     }
@@ -540,6 +559,46 @@ export default function EmployerDashboard({
       {/* Dynamic Panel Views Canvas */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full relative">
           
+          {/* GLOBAL OVERDUE WAGE ALERT NOTIFICATION BANNER */}
+          {overdueWages.length > 0 && normalizedActiveTab !== "wages" && (
+            <div className="mb-6 bg-red-50 border border-red-200 rounded-2xl p-4 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4 animate-in fade-in slide-in-from-top-4 duration-300">
+              <div className="flex items-start space-x-3 text-left">
+                <div className="p-2 bg-red-100 text-red-600 rounded-xl mt-0.5 shrink-0 animate-pulse">
+                  <ShieldAlert className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-black uppercase text-red-950 tracking-wider font-mono">
+                    Urgent Compliance Alert: Worker Wage Settlement Overdue
+                  </h4>
+                  <p className="text-xs text-red-800 font-semibold mt-0.5">
+                    There are <span className="font-bold underline">{overdueWages.length} daily worker shift(s)</span> with outstanding wages awaiting same-day disbursal clearance.
+                  </p>
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {overdueWages.slice(0, 3).map((w, idx) => (
+                      <span key={`overdue-banner-${w.id || idx}-${idx}`} className="px-2.5 py-0.5 bg-white border border-red-200 text-[10px] font-bold text-red-900 rounded-md">
+                        {w.workerName} (₹{w.wageEarned}) - {w.date}
+                      </span>
+                    ))}
+                    {overdueWages.length > 3 && (
+                      <span className="px-2.5 py-0.5 bg-white border border-red-200 text-[10px] font-bold text-red-900 rounded-md">
+                        +{overdueWages.length - 3} more
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setActiveTab("employer-wages");
+                  showToast("Redirecting to Wage Ledger to settle outstanding daily wages...", "info");
+                }}
+                className="px-4.5 py-2 bg-slate-950 hover:bg-slate-850 text-amber-500 font-black text-xs uppercase rounded-xl tracking-wider cursor-pointer border border-slate-950 hover:scale-103 active:scale-97 transition-all flex items-center justify-center gap-1.5 shadow-md font-mono shrink-0"
+              >
+                Settle Wages Now <Coins className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
           {/* RENDER CURRENT PANEL VIEW */}
 
           {normalizedActiveTab === "dashboard" && (
@@ -551,6 +610,7 @@ export default function EmployerDashboard({
               payments={wagePayments}
               complaints={complaints}
               companyRating={4.8}
+              onNavigateTab={setActiveTab}
             />
           )}
 

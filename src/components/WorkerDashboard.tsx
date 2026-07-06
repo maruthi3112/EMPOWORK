@@ -1233,10 +1233,13 @@ export default function WorkerDashboard({
   const handleCheckOut = async () => {
     if (!activeCheckInRecord) return;
     try {
+      const wageValue = activeJob ? Number(activeJob.wage || 800) : Number(activeCheckInRecord.wageEarned || 800);
       const updatedRecord = {
         ...activeCheckInRecord,
         checkOutTime: new Date().toLocaleTimeString(),
-        hoursWorked: 8 // standard full day shift
+        hoursWorked: 8, // standard full day shift
+        wageEarned: wageValue,
+        status: "pending_approval" as const
       };
 
       await setDoc(doc(db, "attendance", activeCheckInRecord.id), updatedRecord);
@@ -1245,7 +1248,7 @@ export default function WorkerDashboard({
       setAttendance(prev => prev.map(r => r.id === activeCheckInRecord.id ? updatedRecord : r));
       
       showToast(
-        `Shift checked out successfully! Daily wage of ₹${activeCheckInRecord.wageEarned} has been logged and queued for contractor approval.`,
+        `Shift checked out successfully! Daily wage of ₹${wageValue} has been logged and queued for contractor approval.`,
         "wage",
         "💰 Wage Logged Successfully"
       );

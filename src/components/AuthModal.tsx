@@ -111,6 +111,36 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }: AuthModalP
     setPhone(cleanVal);
   };
 
+  // Reset all states when the modal is opened
+  useEffect(() => {
+    if (isOpen) {
+      setIsLogin(true);
+      setSignUpStep(1);
+      setEmail("");
+      setPassword("");
+      setShowPassword(false);
+      setName("");
+      setPhone("");
+      setLocation("");
+      setTrade("Mason");
+      setExperience("2 Years");
+      setWorkerType("labour");
+      setWageExpectation(700);
+      setCompanyName("");
+      setBusinessType("Residential Construction");
+      setError("");
+      setLoading(false);
+      setIsSubmitting(false);
+      setEmailTouched(false);
+      setPasswordTouched(false);
+      setNameTouched(false);
+      setPhoneTouched(false);
+      setLocationTouched(false);
+      setCompanyNameTouched(false);
+      setBusinessTypeTouched(false);
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   // Pre-configured Demo Accounts

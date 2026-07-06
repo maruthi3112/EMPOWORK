@@ -2,69 +2,100 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
+    // Reusable security helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
     // Global Safety Net default-deny catch-all
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if false;
     }
 
     // User profiles collection
     match /users/{userId} {
-      allow read, write: if true;
+      allow read: if isSignedIn();
+      allow write: if isOwner(userId);
     }
 
     // Job listings collection
     match /jobs/{jobId} {
-      allow read, write: if true;
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
     }
 
     // Job applications collection
     match /job_applications/{appId} {
-      allow read, write: if true;
+      allow read: if isSignedIn() && (resource.data.workerId == request.auth.uid || resource.data.employerId == request.auth.uid);
+      allow create: if isSignedIn() && incoming().workerId == request.auth.uid;
+      allow update: if isSignedIn() && (resource.data.workerId == request.auth.uid || resource.data.employerId == request.auth.uid);
+      allow delete: if isSignedIn() && resource.data.workerId == request.auth.uid;
     }
 
     // Attendance tracking collection
     match /attendance/{attId} {
-      allow read, write: if true;
+      allow read: if isSignedIn() && (resource.data.workerId == request.auth.uid || resource.data.employerId == request.auth.uid);
+      allow create: if isSignedIn() && (incoming().workerId == request.auth.uid || incoming().employerId == request.auth.uid);
+      allow update: if isSignedIn() && (resource.data.workerId == request.auth.uid || resource.data.employerId == request.auth.uid);
+      allow delete: if isSignedIn() && resource.data.workerId == request.auth.uid;
     }
 
     // Wage payments collection
     match /wage_payments/{payId} {
-      allow read, write: if true;
+      allow read: if isSignedIn() && (resource.data.workerId == request.auth.uid || resource.data.employerId == request.auth.uid);
+      allow create: if isSignedIn() && (incoming().workerId == request.auth.uid || incoming().employerId == request.auth.uid);
+      allow update: if isSignedIn() && (resource.data.workerId == request.auth.uid || resource.data.employerId == request.auth.uid);
+      allow delete: if isSignedIn() && resource.data.employerId == request.auth.uid;
     }
 
     // Complaints/disputes collection
     match /complaints/{compId} {
-      allow read, write: if true;
+      allow read: if isSignedIn() && (resource.data.workerId == request.auth.uid || resource.data.employerId == request.auth.uid);
+      allow create: if isSignedIn() && incoming().workerId == request.auth.uid;
+      allow update: if isSignedIn() && (resource.data.workerId == request.auth.uid || resource.data.employerId == request.auth.uid);
     }
 
     // Savings goals collection
     match /savings_goals/{goalId} {
-      allow read, write: if true;
+      allow read: if isSignedIn() && resource.data.workerId == request.auth.uid;
+      allow create, update, delete: if isSignedIn() && incoming().workerId == request.auth.uid;
     }
 
     // Learning resources collection
     match /learning_resources/{resId} {
-      allow read, write: if true;
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
     }
 
     // Reviews/feedback collection
     match /reviews/{revId} {
-      allow read, write: if true;
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && incoming().employerId == request.auth.uid;
+      allow update: if isSignedIn() && resource.data.employerId == request.auth.uid;
     }
 
     // System audit logs collection
     match /audit_logs/{logId} {
-      allow read, write: if true;
+      allow read, write: if isSignedIn();
     }
 
     // Announcements/broadcasts collection
     match /announcements/{annId} {
-      allow read, write: if true;
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
     }
 
     // Contact/help requests collection
     match /contact_requests/{reqId} {
-      allow read, write: if true;
+      allow read, write: if isSignedIn();
     }
   }
 }

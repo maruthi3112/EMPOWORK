@@ -18,6 +18,7 @@ interface EmployerOverviewProps {
   payments: WagePayment[];
   complaints: Complaint[];
   companyRating: number;
+  onNavigateTab?: (tab: string) => void;
 }
 
 export default function EmployerOverview({
@@ -27,7 +28,8 @@ export default function EmployerOverview({
   attendance = [],
   payments = [],
   complaints = [],
-  companyRating = 4.8
+  companyRating = 4.8,
+  onNavigateTab
 }: EmployerOverviewProps) {
 
   // Compute metrics
@@ -39,6 +41,24 @@ export default function EmployerOverview({
   const todayStr = new Date().toISOString().split("T")[0];
   const todayAttendance = attendance.filter(a => a.date === todayStr).length;
   const openComplaints = complaints.filter(c => c.status === "open" || c.status === "investigating").length;
+
+  // Calculate Overdue Wages based on logged site attendance
+  const overdueShifts = React.useMemo(() => {
+    return attendance.filter(att => {
+      if (!att.checkOutTime) return false;
+      if (att.status === "rejected") return false;
+      if (att.date >= todayStr) return false;
+      const isPaid = payments.some(p => 
+        p.status === "paid" && 
+        (p.id === `wage-${att.id}` || (p.workerId === att.workerId && p.jobId === att.jobId && p.amount === att.wageEarned))
+      );
+      return !isPaid;
+    });
+  }, [attendance, payments, todayStr]);
+
+  const overdueWagesAmount = React.useMemo(() => {
+    return overdueShifts.reduce((sum, s) => sum + s.wageEarned, 0);
+  }, [overdueShifts]);
 
   // Recharts Seed Data
   const payrollTrendData = [
@@ -90,10 +110,74 @@ export default function EmployerOverview({
     <div className="space-y-8 animate-in fade-in duration-300">
       
       {/* Top Header Greetings */}
-      <div>
-        <h2 className="text-xl font-black text-slate-950 uppercase tracking-tight">Overview Dashboard</h2>
-        <p className="text-xs text-slate-500">Real-time construction operations, site safety logs, and payment summary.</p>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-black text-slate-950 uppercase tracking-tight">Overview Dashboard</h2>
+          <p className="text-xs text-slate-500">Real-time construction operations, site safety logs, and payment summary.</p>
+        </div>
+
+        {overdueShifts.length > 0 && (
+          <span className="px-3 py-1 bg-red-50 text-red-700 border border-red-200 rounded-full text-[10px] font-black uppercase tracking-wider animate-pulse flex items-center gap-1.5 self-start md:self-auto font-mono">
+            <span className="h-2 w-2 rounded-full bg-red-600"></span>
+            Labor Regulations Warning Active
+          </span>
+        )}
       </div>
+
+      {/* OVERDUE WAGE SETTLEMENT ALERTS NOTICE */}
+      {overdueShifts.length > 0 && (
+        <div className="bg-gradient-to-r from-red-500 to-rose-600 text-white rounded-2xl p-5 shadow-lg border border-red-600/30 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative overflow-hidden animate-in zoom-in-95 duration-300">
+          {/* Shine ornament */}
+          <div className="absolute -right-16 -top-16 w-32 h-32 bg-white/10 rounded-full filter blur-xl pointer-events-none" />
+          
+          <div className="space-y-2 flex-1 relative z-10">
+            <div className="flex items-center space-x-2">
+              <span className="px-2.5 py-0.5 bg-white text-rose-700 rounded-md text-[9px] font-black uppercase tracking-wider font-mono shadow-xs">
+                Overdue Labor Dues
+              </span>
+              <span className="text-xs font-bold text-rose-100 flex items-center gap-1">
+                <Clock className="w-3.5 h-3.5" /> Exceeds 24 Hours Threshold
+              </span>
+            </div>
+            
+            <h3 className="text-base font-black uppercase tracking-tight leading-tight">
+              Settle Outstanding Daily Wages of ₹{overdueWagesAmount.toLocaleString()} INR
+            </h3>
+            
+            <p className="text-xs font-medium text-rose-100 leading-relaxed max-w-2xl">
+              Indian labor codes and site reputation integrity scores require instant same-day settlement. 
+              Currently, <strong className="text-white underline">{overdueShifts.length} laborers</strong> are awaiting payout clearance based on logged site attendance.
+            </p>
+
+            {/* List mini logs */}
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              {overdueShifts.slice(0, 4).map((s, idx) => (
+                <div key={`overdue-ov-shift-${s.id || idx}-${idx}`} className="px-2 py-1 bg-black/20 rounded-lg text-[10px] font-mono font-bold flex items-center gap-1">
+                  <span>{s.workerName}</span>
+                  <span className="text-amber-300 font-extrabold">₹{s.wageEarned}</span>
+                  <span className="text-white/60">({s.date})</span>
+                </div>
+              ))}
+              {overdueShifts.length > 4 && (
+                <div className="px-2 py-1 bg-black/20 rounded-lg text-[10px] font-mono font-bold">
+                  +{overdueShifts.length - 4} more shifts
+                </div>
+              )}
+            </div>
+          </div>
+
+          <button
+            onClick={() => {
+              if (onNavigateTab) {
+                onNavigateTab("employer-wages");
+              }
+            }}
+            className="px-5 py-3 bg-white text-rose-700 hover:bg-slate-50 font-black text-xs uppercase rounded-xl tracking-wider cursor-pointer shadow-md transition-all shrink-0 font-mono relative z-10 hover:scale-103 active:scale-98"
+          >
+            Clear Outstandings Now →
+          </button>
+        </div>
+      )}
 
       {/* KPI Bento Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
