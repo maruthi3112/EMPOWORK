@@ -585,7 +585,7 @@ export default function EmployerJobs({
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs font-semibold text-slate-700">
                 {currentJobs.length > 0 ? (
-                  currentJobs.map((job) => {
+                  currentJobs.map((job, idx) => {
                     const statusColors: Record<string, string> = {
                       open: "text-amber-700 bg-amber-50 border-amber-200/50",
                       active: "text-emerald-700 bg-emerald-50 border-emerald-200/50",
@@ -596,7 +596,7 @@ export default function EmployerJobs({
                     const appCount = applications.filter(a => a.jobId === job.id).length;
 
                     return (
-                      <tr key={job.id} className="hover:bg-slate-50/55 transition-colors">
+                      <tr key={`${job.id}-${idx}`} className="hover:bg-slate-50/55 transition-colors">
                         <td className="p-4 font-bold text-slate-900 leading-tight">
                           <div className="space-y-0.5">
                             <span className="truncate block font-black text-sm">{job.title}</span>

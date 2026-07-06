@@ -267,7 +267,7 @@ Generated via EmpoWork Recruiter Gateway - ${new Date().toLocaleDateString()}
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs font-semibold text-slate-700">
                 {filteredApps.length > 0 ? (
-                  filteredApps.map((app) => {
+                  filteredApps.map((app, idx) => {
                     const workerProfile = userProfiles[app.workerId];
                     const appStatusColors: Record<string, string> = {
                       pending: "text-amber-700 bg-amber-50 border-amber-200/50",
@@ -276,7 +276,7 @@ Generated via EmpoWork Recruiter Gateway - ${new Date().toLocaleDateString()}
                     };
 
                     return (
-                      <tr key={app.id} className="hover:bg-slate-50/50 transition-colors">
+                      <tr key={`${app.id}-${idx}`} className="hover:bg-slate-50/50 transition-colors">
                         <td className="p-4">
                           <div className="flex items-center space-x-3">
                             <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-600 border border-slate-200/80 shrink-0">
@@ -413,13 +413,13 @@ Generated via EmpoWork Recruiter Gateway - ${new Date().toLocaleDateString()}
         /* Worker Directory Bento Grid */
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredDirectory.length > 0 ? (
-            filteredDirectory.map((worker) => {
+            filteredDirectory.map((worker, idx) => {
               const isSaved = favorites.includes(worker.uid);
               const isBusy = worker.statusState === "busy";
 
               return (
                 <div 
-                  key={worker.uid}
+                  key={`${worker.uid}-${idx}`}
                   className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-5 relative flex flex-col justify-between hover:shadow-md hover:border-slate-300/80 transition-all duration-200"
                 >
                   

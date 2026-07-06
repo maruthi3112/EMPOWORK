@@ -306,11 +306,11 @@ export default function EmployerMessages({
           {/* Active Messages Feed */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {activeChatMsgs.length > 0 ? (
-              activeChatMsgs.map((m) => {
+              activeChatMsgs.map((m, idx) => {
                 const isMe = m.senderId === user.uid;
 
                 return (
-                  <div key={m.id} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
+                  <div key={`${m.id}-${idx}`} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
                     <div className={`max-w-[70%] space-y-1 ${isMe ? "text-right" : "text-left"}`}>
                       <span className="text-[8px] font-mono font-bold text-slate-400 uppercase tracking-widest block">
                         {isMe ? "Foreman" : m.senderName}

@@ -7,6 +7,24 @@ import {
 import { Job, AttendanceRecord, UserProfile } from "../../types";
 import QRCameraScanner from "../QRCameraScanner";
 
+// Helper to robustly parse 12h (AM/PM) and 24h time strings to decimal hours
+function parseTimeToHours(timeStr: string): number {
+  if (!timeStr) return 0;
+  const cleaned = timeStr.trim().toUpperCase();
+  const isPM = cleaned.includes("PM");
+  const isAM = cleaned.includes("AM");
+  const justTime = cleaned.replace(/AM|PM/g, "").trim();
+  const parts = justTime.split(":");
+  let hours = Number(parts[0]) || 0;
+  const minutes = Number(parts[1]) || 0;
+  if (isPM && hours < 12) {
+    hours += 12;
+  } else if (isAM && hours === 12) {
+    hours = 0;
+  }
+  return hours + minutes / 60;
+}
+
 interface EmployerAttendanceProps {
   jobs: Job[];
   attendanceLogs: AttendanceRecord[];
@@ -122,11 +140,28 @@ export default function EmployerAttendance({
 
     setManualLoading(true);
     try {
-      const partsIn = manualCheckIn.split(":");
-      const partsOut = manualCheckOut.split(":");
-      const hours = Number(partsOut[0]) - Number(partsIn[0]) + (Number(partsOut[1]) - Number(partsIn[1])) / 60;
-      const hoursWorked = Math.max(0, Number(hours.toFixed(1)));
-      const wageEarned = Math.round(selectedJob.wage * (hoursWorked / 8)); // pro-rated by 8 hours standard
+      const hoursIn = parseTimeToHours(manualCheckIn);
+      const hoursOut = parseTimeToHours(manualCheckOut);
+      let hoursDiff = hoursOut - hoursIn;
+      if (hoursDiff < 0) {
+        hoursDiff += 24; // Handle overnight shifts crossing midnight
+      }
+      const hoursWorked = Number(hoursDiff.toFixed(1));
+      
+      if (hoursWorked <= 0 || isNaN(hoursWorked)) {
+        alert("Please enter valid check-in and check-out times. The shift duration must be greater than zero.");
+        setManualLoading(false);
+        return;
+      }
+
+      const dailyWage = selectedJob.wage || 800;
+      const wageEarned = Math.round(dailyWage * (hoursWorked / 8)); // pro-rated by 8 hours standard
+
+      if (wageEarned <= 0 || isNaN(wageEarned)) {
+        alert(`The calculated wages are ₹${wageEarned}. Please check the shift duration and job daily wage.`);
+        setManualLoading(false);
+        return;
+      }
 
       const payload: Partial<AttendanceRecord> = {
         id: `att-${manualWorkerId}-${Date.now()}`,
@@ -654,11 +689,11 @@ export default function EmployerAttendance({
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs font-semibold text-slate-700">
               {filteredLogs.length > 0 ? (
-                filteredLogs.map((log) => {
+                filteredLogs.map((log, idx) => {
                   const ppeColors = (checked: boolean) => checked ? "bg-emerald-50 text-emerald-700 border-emerald-100" : "bg-slate-50 text-slate-400 border-slate-100";
 
                   return (
-                    <tr key={log.id} className="hover:bg-slate-50/50 transition-colors">
+                    <tr key={`${log.id}-${idx}`} className="hover:bg-slate-50/50 transition-colors">
                       <td className="p-4">
                         <div className="space-y-0.5">
                           <span className="font-black text-slate-900 text-sm block">{log.workerName}</span>
@@ -674,9 +709,11 @@ export default function EmployerAttendance({
                       <td className="p-4">
                         <div className="space-y-0.5">
                           <p className="font-bold text-slate-800">
-                            IN: <span className="text-slate-900 font-black">{log.checkInTime || "08:00 AM"}</span> | OUT: <span className="text-slate-900 font-black">{log.checkOutTime || "05:00 PM"}</span>
+                            IN: <span className="text-slate-900 font-black">{log.checkInTime || "N/A"}</span> | OUT: <span className="text-slate-900 font-black">{log.checkOutTime || "Active"}</span>
                           </p>
-                          <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">{log.hoursWorked || 8} Hours Logged</span>
+                          <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">
+                            {log.checkOutTime ? `${log.hoursWorked !== undefined ? log.hoursWorked : 8} Hours Logged` : "Active Shift (In-Progress)"}
+                          </span>
                         </div>
                       </td>
                       <td className="p-4">

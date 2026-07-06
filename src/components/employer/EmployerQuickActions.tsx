@@ -513,8 +513,8 @@ export default function EmployerQuickActions({
                             No pending labor ledgers waiting for disbursement.
                           </div>
                         ) : (
-                          pendingPayments.map((pay) => (
-                            <div key={pay.id} className="p-3 flex items-center justify-between text-xs">
+                          pendingPayments.map((pay, idx) => (
+                            <div key={`${pay.id}-${idx}`} className="p-3 flex items-center justify-between text-xs">
                               <div>
                                 <p className="font-bold text-slate-900">{pay.workerName}</p>
                                 <p className="text-[10px] text-slate-500 font-mono font-semibold">{pay.jobTitle}</p>

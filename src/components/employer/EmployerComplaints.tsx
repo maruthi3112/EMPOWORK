@@ -393,9 +393,9 @@ export default function EmployerComplaints({
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs font-semibold text-slate-700">
               {filteredComplaints.length > 0 ? (
-                filteredComplaints.map((c) => {
+                filteredComplaints.map((c, idx) => {
                   return (
-                    <tr key={c.id} className="hover:bg-slate-50/50 transition-colors">
+                    <tr key={`${c.id}-${idx}`} className="hover:bg-slate-50/50 transition-colors">
                       <td className="p-4 font-mono font-bold text-slate-400 uppercase">
                         {c.id}
                       </td>

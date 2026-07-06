@@ -443,9 +443,9 @@ TRANSACTION HASH ID: ${payment.transactionId || "TXN-SECURE-HANDSHAKE-PENDING"}
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs font-semibold text-slate-700">
               {filteredPayments.length > 0 ? (
-                filteredPayments.map((p) => {
+                filteredPayments.map((p, idx) => {
                   return (
-                    <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
+                    <tr key={`${p.id}-${idx}`} className="hover:bg-slate-50/50 transition-colors">
                       <td className="p-4 font-mono font-bold text-slate-400 uppercase">
                         {p.id}
                       </td>
