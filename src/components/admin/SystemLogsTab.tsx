@@ -211,8 +211,8 @@ export default function SystemLogsTab({ onRefresh, logAction }: SystemLogsTabPro
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {filteredLogs.map((log) => (
-                      <tr key={log.id} className="hover:bg-slate-50/50 text-[11px]">
+                    {filteredLogs.map((log, idx) => (
+                      <tr key={`${log.id || idx}-${idx}`} className="hover:bg-slate-50/50 text-[11px]">
                         <td className="p-3 font-bold text-slate-950 uppercase flex items-center gap-1.5">
                           <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                           {log.action}

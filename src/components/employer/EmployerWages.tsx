@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { 
   Coins, Search, FileSpreadsheet, ArrowUpRight, CheckCircle, XCircle, 
   RefreshCw, Landmark, Sliders, Play, FileMinus, ExternalLink, ShieldCheck, 
-  AlertCircle, Download, Check, HelpCircle
+  AlertCircle, Download, Check, HelpCircle, Calendar
 } from "lucide-react";
 import { WagePayment, UserProfile } from "../../types";
 
@@ -24,6 +24,59 @@ export default function EmployerWages({
   
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+
+  // Date Filtering State
+  const [datePreset, setDatePreset] = useState("all");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+
+  const handleDatePresetChange = (preset: string) => {
+    setDatePreset(preset);
+    const now = new Date();
+    
+    if (preset === "all") {
+      setStartDate("");
+      setEndDate("");
+    } else if (preset === "this-week") {
+      // Monday of this week to Sunday of this week
+      const currentDay = now.getDay();
+      const distanceToMonday = currentDay === 0 ? -6 : 1 - currentDay;
+      const monday = new Date(now);
+      monday.setDate(now.getDate() + distanceToMonday);
+      
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+      
+      setStartDate(monday.toISOString().split("T")[0]);
+      setEndDate(sunday.toISOString().split("T")[0]);
+    } else if (preset === "last-week") {
+      // Monday of last week to Sunday of last week
+      const currentDay = now.getDay();
+      const distanceToMonday = currentDay === 0 ? -6 : 1 - currentDay;
+      const lastMonday = new Date(now);
+      lastMonday.setDate(now.getDate() + distanceToMonday - 7);
+      
+      const lastSunday = new Date(lastMonday);
+      lastSunday.setDate(lastMonday.getDate() + 6);
+      
+      setStartDate(lastMonday.toISOString().split("T")[0]);
+      setEndDate(lastSunday.toISOString().split("T")[0]);
+    } else if (preset === "this-month") {
+      // 1st of this month to last day of this month
+      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+      const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      
+      setStartDate(firstDay.toISOString().split("T")[0]);
+      setEndDate(lastDay.toISOString().split("T")[0]);
+    } else if (preset === "last-month") {
+      // 1st of last month to last day of last month
+      const firstDayOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const lastDayOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+      
+      setStartDate(firstDayOfLastMonth.toISOString().split("T")[0]);
+      setEndDate(lastDayOfLastMonth.toISOString().split("T")[0]);
+    }
+  };
 
   // Secure Portal Overlay State
   const [activePayingPayment, setActivePayingPayment] = useState<WagePayment | null>(null);
@@ -83,7 +136,40 @@ export default function EmployerWages({
                           jobTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           p.id.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === "all" || p.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    
+    // Date Filtering Logic
+    let matchesDate = true;
+    if (startDate || endDate) {
+      if (p.date) {
+        const itemDateStr = p.date.trim();
+        const isStandardPattern = /^\d{4}-\d{2}-\d{2}$/.test(itemDateStr);
+        if (isStandardPattern) {
+          if (startDate && itemDateStr < startDate) {
+            matchesDate = false;
+          }
+          if (endDate && itemDateStr > endDate) {
+            matchesDate = false;
+          }
+        } else {
+          // Fallback to JS Date parsing
+          const itemTime = new Date(p.date).getTime();
+          if (!isNaN(itemTime)) {
+            if (startDate) {
+              const startTime = new Date(startDate).getTime();
+              if (itemTime < startTime) matchesDate = false;
+            }
+            if (endDate) {
+              const endTime = new Date(endDate + "T23:59:59").getTime();
+              if (itemTime > endTime) matchesDate = false;
+            }
+          }
+        }
+      } else {
+        matchesDate = false;
+      }
+    }
+    
+    return matchesSearch && matchesStatus && matchesDate;
   });
 
   // Export payroll ledger
@@ -400,7 +486,7 @@ TRANSACTION HASH ID: ${payment.transactionId || "TXN-SECURE-HANDSHAKE-PENDING"}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
         
         {/* Table Filters header */}
-        <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
           <div className="relative max-w-sm w-full">
             <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
             <input
@@ -412,18 +498,80 @@ TRANSACTION HASH ID: ${payment.transactionId || "TXN-SECURE-HANDSHAKE-PENDING"}
             />
           </div>
 
-          <div className="flex items-center space-x-3 text-xs">
-            <span className="font-bold text-slate-500">Status:</span>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="p-1.5 border border-slate-200 rounded-lg bg-white font-bold text-slate-700"
-            >
-              <option value="all">All Ledgers</option>
-              <option value="pending">Pending Payment</option>
-              <option value="paid">Paid & Transferred</option>
-              <option value="rejected">Rejected Dispute</option>
-            </select>
+          <div className="flex flex-wrap items-center gap-4 text-xs">
+            {/* Status Filter */}
+            <div className="flex items-center space-x-2">
+              <span className="font-bold text-slate-500">Status:</span>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="p-1.5 border border-slate-200 rounded-lg bg-white font-bold text-slate-750 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              >
+                <option value="all">All Ledgers</option>
+                <option value="pending">Pending Payment</option>
+                <option value="paid">Paid & Transferred</option>
+                <option value="rejected">Rejected Dispute</option>
+              </select>
+            </div>
+
+            {/* Date Range Picker */}
+            <div className="flex flex-wrap items-center gap-2 md:border-l md:border-slate-200 md:pl-4">
+              <div className="flex items-center space-x-2">
+                <Calendar className="w-4 h-4 text-indigo-600" />
+                <span className="font-bold text-slate-500">Period:</span>
+                <select
+                  value={datePreset}
+                  onChange={(e) => handleDatePresetChange(e.target.value)}
+                  className="p-1.5 border border-slate-200 rounded-lg bg-white font-bold text-slate-750 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                >
+                  <option value="all">All Time</option>
+                  <option value="this-week">This Week</option>
+                  <option value="last-week">Last Week</option>
+                  <option value="this-month">This Month</option>
+                  <option value="last-month">Last Month</option>
+                  <option value="custom">Custom Range</option>
+                </select>
+              </div>
+
+              {(datePreset === "custom" || startDate || endDate) && (
+                <div className="flex items-center space-x-1.5 bg-white p-1 rounded-lg border border-slate-200">
+                  <input
+                    type="date"
+                    id="wage-start-date"
+                    value={startDate}
+                    onChange={(e) => {
+                      setStartDate(e.target.value);
+                      if (datePreset !== "custom") setDatePreset("custom");
+                    }}
+                    className="p-1 text-[11px] border-none bg-transparent font-semibold text-slate-850 focus:outline-none"
+                  />
+                  <span className="text-slate-400 font-bold text-[10px]">to</span>
+                  <input
+                    type="date"
+                    id="wage-end-date"
+                    value={endDate}
+                    onChange={(e) => {
+                      setEndDate(e.target.value);
+                      if (datePreset !== "custom") setDatePreset("custom");
+                    }}
+                    className="p-1 text-[11px] border-none bg-transparent font-semibold text-slate-850 focus:outline-none"
+                  />
+                  {(startDate || endDate) && (
+                    <button
+                      id="clear-wage-dates-btn"
+                      onClick={() => {
+                        setStartDate("");
+                        setEndDate("");
+                        setDatePreset("all");
+                      }}
+                      className="text-[10px] text-rose-500 hover:text-rose-600 font-bold px-1"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 

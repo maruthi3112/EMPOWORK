@@ -839,7 +839,7 @@ export default function IndustrialHubTools() {
                           const isChecked = !!checkedSafetyItems[itemKey];
                           return (
                             <label 
-                              key={idx}
+                              key={itemKey}
                               className={`flex items-start space-x-3 p-3 text-left cursor-pointer select-none transition-all ${
                                 isChecked 
                                   ? "bg-emerald-50/40 hover:bg-emerald-50/60" 

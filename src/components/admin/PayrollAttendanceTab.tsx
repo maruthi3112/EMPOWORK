@@ -207,11 +207,11 @@ export default function PayrollAttendanceTab({ attendanceRecords, wagePayments, 
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {filteredAttendance.length > 0 ? (
-                    filteredAttendance.map(rec => {
+                    filteredAttendance.map((rec, idx) => {
                       const isPending = rec.status === "pending_approval";
                       return (
                         <tr 
-                          key={rec.id}
+                          key={`${rec.id || idx}-${idx}`}
                           onClick={() => setSelectedRecord(rec)}
                           className={`hover:bg-slate-50/80 cursor-pointer transition-colors ${selectedRecord?.id === rec.id ? "bg-amber-50/50" : ""}`}
                         >
@@ -263,11 +263,11 @@ export default function PayrollAttendanceTab({ attendanceRecords, wagePayments, 
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {filteredPayments.length > 0 ? (
-                    filteredPayments.map(pay => {
+                    filteredPayments.map((pay, idx) => {
                       const status = pay.status || "pending";
                       return (
                         <tr 
-                          key={pay.id}
+                          key={`${pay.id || idx}-${idx}`}
                           onClick={() => setSelectedPayment(pay)}
                           className={`hover:bg-slate-50/80 cursor-pointer transition-colors ${selectedPayment?.id === pay.id ? "bg-amber-50/50" : ""}`}
                         >

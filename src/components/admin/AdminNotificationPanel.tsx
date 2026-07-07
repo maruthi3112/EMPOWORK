@@ -172,8 +172,14 @@ export default function AdminNotificationPanel({ currentTab, setCurrentTab }: Ad
     }
   });
 
-  // Filter out dismissed alerts
-  const activeAlerts = alerts.filter(a => !dismissedIds.includes(a.id));
+  // Filter out dismissed alerts and deduplicate by ID
+  const seenAlertIds = new Set<string>();
+  const activeAlerts = alerts.filter(a => {
+    if (dismissedIds.includes(a.id)) return false;
+    if (seenAlertIds.has(a.id)) return false;
+    seenAlertIds.add(a.id);
+    return true;
+  });
 
   // Sort alerts: priority (danger first, then warning, then info/success), then newest first
   const priorityScore = { danger: 4, warning: 3, info: 2, success: 1 };

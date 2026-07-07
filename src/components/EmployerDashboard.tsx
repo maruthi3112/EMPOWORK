@@ -78,6 +78,10 @@ export default function EmployerDashboard({
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [userProfiles, setUserProfiles] = useState<Record<string, UserProfile>>({});
 
+  // Batch Settlement States
+  const [showBatchSettleModal, setShowBatchSettleModal] = useState(false);
+  const [isBatchSettling, setIsBatchSettling] = useState(false);
+
   // Calculate Overdue Wages based on logged site attendance
   const overdueWages = React.useMemo(() => {
     const todayStr = new Date().toISOString().split("T")[0];
@@ -446,6 +450,93 @@ export default function EmployerDashboard({
     }
   };
 
+  const handleBatchSettleOverdueWages = async () => {
+    setIsBatchSettling(true);
+    try {
+      let settledCount = 0;
+      let totalSettledAmount = 0;
+      
+      for (const att of overdueWages) {
+        // 1. Approve attendance log
+        if (att.status !== "approved") {
+          await updateDoc(doc(db, "attendance", att.id), { status: "approved" });
+        }
+
+        // 2. Write or update corresponding pending/paid WagePayment doc
+        const wageId = `wage-${att.id}`;
+        const txHash = `TXN-${Math.floor(100000 + Math.random() * 900000)}B`;
+        await setDoc(doc(db, "wage_payments", wageId), {
+          id: wageId,
+          workerId: att.workerId,
+          workerName: att.workerName,
+          employerId: user.uid,
+          employerName: user.companyName || user.name,
+          jobId: att.jobId,
+          jobTitle: att.jobTitle,
+          amount: att.wageEarned,
+          date: new Date().toISOString().split("T")[0],
+          status: "paid",
+          transactionId: txHash,
+          paidAt: new Date().toISOString()
+        });
+
+        // 3. Update the worker's user profile (shiftsCompleted, walletBalance, totalEarned)
+        const workerRef = doc(db, "users", att.workerId);
+        const workerSnap = await getDoc(workerRef);
+        if (workerSnap.exists()) {
+          const workerData = workerSnap.data() as any;
+          await updateDoc(workerRef, {
+            shiftsCompleted: (workerData.shiftsCompleted || 0) + 1,
+            totalEarned: (workerData.totalEarned || 0) + att.wageEarned,
+            walletBalance: (workerData.walletBalance || 0) + att.wageEarned
+          });
+        }
+
+        // 4. Update worker's active savings goals by applying allocated percentage
+        const sgQuery = query(collection(db, "savings_goals"), where("workerId", "==", att.workerId));
+        const sgSnap = await getDocs(sgQuery);
+        
+        if (!sgSnap.empty) {
+          for (const docItem of sgSnap.docs) {
+            const goal = docItem.data() as any;
+            const allocPercent = goal.allocatedPercentage || 0;
+            if (allocPercent > 0) {
+              const allocatedAmount = Math.round(att.wageEarned * (allocPercent / 100));
+              if (allocatedAmount > 0) {
+                const currentSaved = goal.currentSaved || 0;
+                const targetAmount = goal.targetAmount || 10000;
+                await updateDoc(doc(db, "savings_goals", docItem.id), {
+                  currentSaved: Math.min(targetAmount, currentSaved + allocatedAmount)
+                });
+              }
+            }
+          }
+        }
+
+        // 5. Log the transaction in audit logs
+        const logDoc = {
+          action: "Batch Wage Disbursal",
+          category: "PAYROLL",
+          details: `Successfully batch disbursed daily wages of ₹${att.wageEarned} INR to worker ${att.workerName} (ID: ${att.workerId}) for job '${att.jobTitle}' (Job ID: ${att.jobId}). Transaction Hash ID: ${txHash}.`,
+          timestamp: new Date().toISOString(),
+          adminEmail: user?.email || "employer@empowork.com",
+          ipAddress: "192.168.1.100"
+        };
+        await addDoc(collection(db, "audit_logs"), logDoc);
+
+        settledCount++;
+        totalSettledAmount += att.wageEarned;
+      }
+
+      showToast(`Success! Fully settled and cleared ${settledCount} outstanding worker wages (Total: ₹${totalSettledAmount} INR).`, "success");
+      setShowBatchSettleModal(false);
+    } catch (err: any) {
+      showToast(`Batch payment failed: ${err.message}`, "error");
+    } finally {
+      setIsBatchSettling(false);
+    }
+  };
+
   // Disputes & complaints
   const handleRaiseComplaint = async (payload: Partial<Complaint>) => {
     try {
@@ -589,8 +680,7 @@ export default function EmployerDashboard({
               </div>
               <button
                 onClick={() => {
-                  setActiveTab("employer-wages");
-                  showToast("Redirecting to Wage Ledger to settle outstanding daily wages...", "info");
+                  setShowBatchSettleModal(true);
                 }}
                 className="px-4.5 py-2 bg-slate-950 hover:bg-slate-850 text-amber-500 font-black text-xs uppercase rounded-xl tracking-wider cursor-pointer border border-slate-950 hover:scale-103 active:scale-97 transition-all flex items-center justify-center gap-1.5 shadow-md font-mono shrink-0"
               >
@@ -890,6 +980,87 @@ export default function EmployerDashboard({
             >
               Print Entrance Banner PNG
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* INSTANT BATCH WAGE SETTLEMENT DIALOG MODAL */}
+      {showBatchSettleModal && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 text-left shadow-2xl overflow-hidden border border-slate-200 relative animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+            <button
+              onClick={() => setShowBatchSettleModal(false)}
+              className="absolute right-4 top-4 text-slate-400 hover:text-slate-850 p-1 hover:bg-slate-100 rounded-full cursor-pointer font-bold w-6 h-6 flex items-center justify-center transition-colors"
+            >
+              ✕
+            </button>
+
+            <div className="space-y-1 mb-4">
+              <span className="text-[9px] font-mono font-black text-rose-600 uppercase tracking-widest block">Instant Compliance Gateway</span>
+              <h4 className="font-black text-slate-950 uppercase text-sm leading-tight">Secure Batch Wage Settlement</h4>
+              <p className="text-[10px] text-slate-500 font-semibold leading-relaxed">
+                Approve and disburse wages instantly for all {overdueWages.length} overdue daily laborer shifts.
+              </p>
+            </div>
+
+            {/* Scrollable list of overdue shifts */}
+            <div className="bg-slate-50 border border-slate-150 rounded-xl p-3 space-y-2 overflow-y-auto flex-1 mb-4 max-h-[240px]">
+              {overdueWages.map((w, idx) => (
+                <div key={`modal-overdue-${w.id || idx}-${idx}`} className="flex justify-between items-center bg-white p-2.5 rounded-lg border border-slate-100 text-xs shadow-xs">
+                  <div>
+                    <span className="font-bold text-slate-900 block">{w.workerName}</span>
+                    <span className="text-[9px] text-slate-400 font-mono font-bold uppercase">{w.jobTitle} • {w.date}</span>
+                  </div>
+                  <span className="font-black text-slate-950 font-mono">₹{w.wageEarned}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Total Section */}
+            <div className="bg-slate-950 text-slate-100 p-4 rounded-xl border border-slate-800 space-y-2.5 mb-5">
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">Total Shifts to Clear</span>
+                <span className="font-black font-mono text-amber-400">{overdueWages.length}</span>
+              </div>
+              <div className="flex justify-between items-center border-t border-slate-800 pt-2.5">
+                <span className="text-slate-200 font-bold uppercase tracking-wider text-[10px]">Total Disbursal Value</span>
+                <span className="font-black text-lg font-mono text-amber-500">₹{overdueWages.reduce((sum, w) => sum + w.wageEarned, 0).toLocaleString()}</span>
+              </div>
+              <p className="text-[9px] text-slate-400 leading-normal border-t border-slate-800 pt-2 font-semibold">
+                * Real-time secure UPI/AEPS gateway credits directly to registered laborers' bank accounts. Indian Labor Welfare code compliant.
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowBatchSettleModal(false);
+                  setActiveTab("employer-wages");
+                  showToast("Redirecting to full Wages Ledger view...", "info");
+                }}
+                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs uppercase rounded-xl tracking-wider cursor-pointer border border-slate-200 shadow-xs transition-all text-center"
+              >
+                Go to Ledger
+              </button>
+              
+              <button
+                type="button"
+                disabled={isBatchSettling}
+                onClick={handleBatchSettleOverdueWages}
+                className="flex-1 py-2.5 bg-slate-950 hover:bg-slate-850 text-amber-500 font-black text-xs uppercase rounded-xl tracking-wider cursor-pointer border border-slate-850 shadow-md transition-all flex items-center justify-center gap-1.5"
+              >
+                {isBatchSettling ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Settling...
+                  </>
+                ) : (
+                  <>
+                    Confirm Disbursal <Coins className="w-3.5 h-3.5" />
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

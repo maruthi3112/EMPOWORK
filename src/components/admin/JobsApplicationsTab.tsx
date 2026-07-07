@@ -188,12 +188,12 @@ export default function JobsApplicationsTab({ jobs, jobApplications, onRefresh, 
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {filteredJobs.length > 0 ? (
-                    filteredJobs.map(job => {
+                    filteredJobs.map((job, idx) => {
                       const isPending = (job as any).status === "pending_approval";
                       const status = (job as any).status || "open";
                       return (
                         <tr 
-                          key={job.id}
+                          key={`${job.id || idx}-${idx}`}
                           onClick={() => setSelectedJob(job)}
                           className={`hover:bg-slate-50/80 cursor-pointer transition-colors ${selectedJob?.id === job.id ? "bg-amber-50/50" : ""}`}
                         >
@@ -246,11 +246,11 @@ export default function JobsApplicationsTab({ jobs, jobApplications, onRefresh, 
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {filteredApplications.length > 0 ? (
-                    filteredApplications.map(app => {
+                    filteredApplications.map((app, idx) => {
                       const status = app.status || "pending";
                       return (
                         <tr 
-                          key={app.id}
+                          key={`${app.id || idx}-${idx}`}
                           onClick={() => setSelectedApplication(app)}
                           className={`hover:bg-slate-50/80 cursor-pointer transition-colors ${selectedApplication?.id === app.id ? "bg-amber-50/50" : ""}`}
                         >

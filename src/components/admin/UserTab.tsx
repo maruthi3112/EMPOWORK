@@ -213,11 +213,11 @@ export default function UserTab({ workers, employers, admins, onRefresh, logActi
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredUsers.length > 0 ? (
-                  filteredUsers.map(user => {
+                  filteredUsers.map((user, idx) => {
                     const status = (user as any).status || "active";
                     return (
                       <tr 
-                        key={user.uid} 
+                        key={`${user.uid || idx}-${idx}`} 
                         onClick={() => setSelectedUser(user)}
                         className={`hover:bg-slate-50/80 cursor-pointer transition-colors ${selectedUser?.uid === user.uid ? "bg-amber-50/50" : ""}`}
                       >

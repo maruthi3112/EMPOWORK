@@ -207,11 +207,11 @@ export default function WorkerEmployerTab({ workers, employers, onRefresh, logAc
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {filteredWorkers.length > 0 ? (
-                    filteredWorkers.map(w => {
+                    filteredWorkers.map((w, idx) => {
                       const isVerified = !!(w as any).identityVerified;
                       return (
                         <tr 
-                          key={w.uid}
+                          key={`${w.uid || idx}-${idx}`}
                           onClick={() => setSelectedProfile(w)}
                           className={`hover:bg-slate-50/80 cursor-pointer transition-colors ${selectedProfile?.uid === w.uid ? "bg-amber-50/50" : ""}`}
                         >
@@ -263,12 +263,12 @@ export default function WorkerEmployerTab({ workers, employers, onRefresh, logAc
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {filteredEmployers.length > 0 ? (
-                    filteredEmployers.map(e => {
+                    filteredEmployers.map((e, idx) => {
                       const isVerified = !!(e as any).businessVerified;
                       const safetyRating = (e as any).safetyRating || 5;
                       return (
                         <tr 
-                          key={e.uid}
+                          key={`${e.uid || idx}-${idx}`}
                           onClick={() => setSelectedProfile(e)}
                           className={`hover:bg-slate-50/80 cursor-pointer transition-colors ${selectedProfile?.uid === e.uid ? "bg-amber-50/50" : ""}`}
                         >

@@ -357,11 +357,11 @@ export default function DatabaseBackupTab({
                     <>
                       {/* Phone duplicates */}
                       {duplicatesReport.duplicateAccounts.map((group: any, idx: number) => (
-                        <div key={`phone-${group.key || idx}`} className="p-3 bg-amber-50/50 border border-amber-200 rounded-lg text-xs space-y-2">
+                        <div key={`phone-${group.key || idx}-${idx}`} className="p-3 bg-amber-50/50 border border-amber-200 rounded-lg text-xs space-y-2">
                           <div className="font-bold text-amber-900 uppercase tracking-tight">{group.description}</div>
                           <div className="space-y-1">
                             {group.items.map((it: any, i: number) => (
-                              <div key={`phone-item-${it.uid || i}`} className="text-[10px] text-slate-500 font-mono">
+                              <div key={`phone-item-${it.uid || i}-${i}`} className="text-[10px] text-slate-500 font-mono">
                                 • {it.name} ({it.email} | Role: {it.role})
                               </div>
                             ))}
@@ -377,7 +377,7 @@ export default function DatabaseBackupTab({
 
                       {/* Job duplicates */}
                       {duplicatesReport.duplicateJobs.map((group: any, idx: number) => (
-                        <div key={`job-${group.key || idx}`} className="p-3 bg-amber-50/50 border border-amber-200 rounded-lg text-xs space-y-2">
+                        <div key={`job-${group.key || idx}-${idx}`} className="p-3 bg-amber-50/50 border border-amber-200 rounded-lg text-xs space-y-2">
                           <div className="font-bold text-amber-900 uppercase tracking-tight">{group.description}</div>
                           <button
                             onClick={() => handleMergeDuplicate("job", group.items)}
@@ -390,7 +390,7 @@ export default function DatabaseBackupTab({
 
                       {/* Double apps duplicates */}
                       {duplicatesReport.duplicateApps.map((group: any, idx: number) => (
-                        <div key={`app-${group.key || idx}`} className="p-3 bg-amber-50/50 border border-amber-200 rounded-lg text-xs space-y-2">
+                        <div key={`app-${group.key || idx}-${idx}`} className="p-3 bg-amber-50/50 border border-amber-200 rounded-lg text-xs space-y-2">
                           <div className="font-bold text-amber-900 uppercase tracking-tight">{group.description}</div>
                           <button
                             onClick={() => handleMergeDuplicate("application", group.items)}
@@ -418,7 +418,7 @@ export default function DatabaseBackupTab({
                     </div>
                   ) : (
                     duplicatesReport.spamItems.map((item: any, idx: number) => (
-                      <div key={`spam-${item.id || idx}`} className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs space-y-2">
+                      <div key={`spam-${item.id || idx}-${idx}`} className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs space-y-2">
                         <div className="flex justify-between items-start font-bold text-red-900 uppercase tracking-tight">
                           <span>{item.title}</span>
                           <span className="text-[9px] font-mono uppercase bg-red-100 px-1.5 py-0.5 rounded">{item.type}</span>

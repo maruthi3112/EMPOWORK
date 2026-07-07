@@ -254,11 +254,11 @@ export default function DisputeTab({
 
           <div className="overflow-y-auto flex-1 divide-y divide-slate-100">
             {complaints.length > 0 ? (
-              complaints.map(c => {
+              complaints.map((c, idx) => {
                 const isResolved = c.status === "resolved";
                 return (
                   <div 
-                    key={c.id}
+                    key={`${c.id || idx}-${idx}`}
                     onClick={() => setSelectedComplaint(c)}
                     className={`p-4 cursor-pointer text-xs hover:bg-slate-50 transition-colors ${selectedComplaint?.id === c.id ? "bg-amber-50/50 border-r-2 border-slate-900" : ""}`}
                   >
