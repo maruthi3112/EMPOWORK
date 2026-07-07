@@ -433,6 +433,19 @@ export default function EmployerDashboard({
       };
       await addDoc(collection(db, "audit_logs"), logDoc);
 
+      // 5. Create a real-time notification in Firestore for the worker
+      const newNotification = {
+        id: `notif-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        workerId: pay.workerId,
+        employerId: user.uid,
+        title: "💰 Wage Disbursed",
+        message: `Your daily wage of ₹${pay.amount} for the shift on '${pay.jobTitle}' has been successfully processed and disbursed.`,
+        type: "wage_disbursed",
+        read: false,
+        createdAt: new Date().toISOString()
+      };
+      await setDoc(doc(db, "notifications", newNotification.id), newNotification);
+
       showToast(`Wages successfully transferred! TXN Hash: ${txHash}`, "success");
       return txHash;
     } catch (err: any) {
@@ -565,14 +578,19 @@ export default function EmployerDashboard({
     }
   };
 
-  const handleAddComplaintComment = async (complaintId: string, author: string, text: string) => {
+  const handleAddComplaintComment = async (complaintId: string, author: string, text: string, role?: string) => {
     try {
       const cRef = doc(db, "complaints", complaintId);
       const found = complaints.find(c => c.id === complaintId);
       if (found) {
         const comments = [
           ...(found.comments || []),
-          { author, text, timestamp: new Date().toISOString().split("T")[0] }
+          { 
+            author, 
+            text, 
+            timestamp: new Date().toISOString(), 
+            role: role || "employer" 
+          }
         ];
         await updateDoc(cRef, { comments });
         showToast("Arbitration statement recorded.", "success");

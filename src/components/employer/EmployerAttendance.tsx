@@ -406,8 +406,8 @@ export default function EmployerAttendance({
                   required
                 >
                   <option value="">-- Choose Job --</option>
-                  {jobs.filter(j => j.status === "open" || j.status === "active").map(j => (
-                    <option key={j.id} value={j.id}>{j.title}</option>
+                  {jobs.filter(j => j.status === "open" || j.status === "active").map((j, idx) => (
+                    <option key={`${j.id}-${idx}`} value={j.id}>{j.title}</option>
                   ))}
                 </select>
               </div>
@@ -421,8 +421,8 @@ export default function EmployerAttendance({
                   required
                 >
                   <option value="">-- Choose Worker --</option>
-                  {listWorkers.map(w => (
-                    <option key={w.uid} value={w.uid}>{w.name} ({w.trade || "Laborer"})</option>
+                  {listWorkers.map((w, idx) => (
+                    <option key={`${w.uid}-${idx}`} value={w.uid}>{w.name} ({w.trade || "Laborer"})</option>
                   ))}
                 </select>
               </div>
@@ -547,8 +547,8 @@ export default function EmployerAttendance({
                   className="w-full p-2.5 text-xs border border-slate-800 rounded-lg bg-slate-900 text-white font-bold cursor-pointer"
                 >
                   <option value="">-- Choose Registered Worker --</option>
-                  {listWorkers.map(w => (
-                    <option key={w.uid} value={w.uid}>{w.name} ({w.trade || "General Laborer"})</option>
+                  {listWorkers.map((w, idx) => (
+                    <option key={`${w.uid}-${idx}`} value={w.uid}>{w.name} ({w.trade || "General Laborer"})</option>
                   ))}
                 </select>
                 <p className="text-[10px] text-slate-500 mt-1.5 leading-normal">
@@ -602,8 +602,8 @@ export default function EmployerAttendance({
                         required
                       >
                         <option value="">-- Choose Job --</option>
-                        {jobs.filter(j => j.status === "open" || j.status === "active").map(j => (
-                          <option key={j.id} value={j.id}>{j.title}</option>
+                        {jobs.filter(j => j.status === "open" || j.status === "active").map((j, idx) => (
+                          <option key={`${j.id}-${idx}`} value={j.id}>{j.title}</option>
                         ))}
                       </select>
                     </div>

@@ -15,7 +15,7 @@ interface EmployerComplaintsProps {
   wagePayments?: WagePayment[];
   onRaiseComplaint: (payload: Partial<Complaint>) => Promise<any>;
   onResolveComplaint: (complaintId: string, notes?: string) => Promise<any>;
-  onAddComplaintComment: (complaintId: string, author: string, text: string) => Promise<any>;
+  onAddComplaintComment: (complaintId: string, author: string, text: string, role?: string) => Promise<any>;
 }
 
 export default function EmployerComplaints({
@@ -186,7 +186,7 @@ export default function EmployerComplaints({
     try {
       const author = user.companyName || user.name;
       const text = newComment.trim();
-      await onAddComplaintComment(selectedComplaint.id, author, text);
+      await onAddComplaintComment(selectedComplaint.id, author, text, "employer");
 
       // Update local overlay state
       setSelectedComplaint(prev => {
@@ -195,7 +195,7 @@ export default function EmployerComplaints({
           ...prev,
           comments: [
             ...(prev.comments || []),
-            { author, text, timestamp: new Date().toISOString().split("T")[0] }
+            { author, text, timestamp: new Date().toISOString(), role: "employer" }
           ]
         };
       });
@@ -278,8 +278,8 @@ export default function EmployerComplaints({
                   required
                 >
                   <option value="">-- Choose Job --</option>
-                  {jobs.map(j => (
-                    <option key={j.id} value={j.id}>{j.title}</option>
+                  {jobs.map((j, idx) => (
+                    <option key={`${j.id}-${idx}`} value={j.id}>{j.title}</option>
                   ))}
                 </select>
               </div>
@@ -293,8 +293,8 @@ export default function EmployerComplaints({
                   required
                 >
                   <option value="">-- Choose Worker --</option>
-                  {listWorkers.map(w => (
-                    <option key={w.uid} value={w.uid}>{w.name}</option>
+                  {listWorkers.map((w, idx) => (
+                    <option key={`${w.uid}-${idx}`} value={w.uid}>{w.name}</option>
                   ))}
                 </select>
               </div>
@@ -501,20 +501,77 @@ export default function EmployerComplaints({
               </div>
 
               {/* Comment logs stream */}
-              <div className="space-y-2">
-                <span className="text-[10px] text-slate-400 uppercase font-bold block">Recruiter & Worker Statements Ledger</span>
-                <div className="space-y-2.5 border-l border-slate-100 pl-3">
-                  {(selectedComplaint.comments || []).map((comm, idx) => (
-                    <div key={idx} className="space-y-0.5 text-xs">
-                      <div className="flex items-center justify-between">
-                        <span className="font-black text-slate-950 uppercase">{comm.author}</span>
-                        <span className="text-[9px] text-slate-400 font-mono">{comm.timestamp}</span>
-                      </div>
-                      <p className="text-slate-600 font-semibold leading-normal">{comm.text}</p>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                  <span className="text-[10px] text-slate-400 uppercase font-black tracking-wider font-mono">
+                    💬 Real-Time Mediation Chat Room
+                  </span>
+                  <span className="bg-indigo-100 text-indigo-900 text-[9px] font-bold font-mono px-2 py-0.5 rounded uppercase">
+                    Live Discussion Channel
+                  </span>
+                </div>
+
+                {/* Chat Feed */}
+                <div className="space-y-3.5 max-h-60 overflow-y-auto p-2 bg-slate-50 rounded-xl border border-slate-100">
+                  {selectedComplaint.comments && selectedComplaint.comments.length > 0 ? (
+                    selectedComplaint.comments.map((comm, idx) => {
+                      const isSelf = comm.role === "employer";
+                      const isAdmin = comm.role === "admin";
+                      const isWorker = comm.role === "worker" || (!isSelf && !isAdmin);
+
+                      return (
+                        <div
+                          key={idx}
+                          className={`flex flex-col ${
+                            isSelf ? "items-end" : isAdmin ? "items-center" : "items-start"
+                          }`}
+                        >
+                          <div
+                            className={`max-w-[85%] rounded-2xl p-3 shadow-2xs ${
+                              isSelf
+                                ? "bg-indigo-600 text-white rounded-tr-none"
+                                : isAdmin
+                                ? "bg-amber-50 border border-amber-200 text-slate-900"
+                                : "bg-white border border-slate-200 text-slate-900 rounded-tl-none"
+                            }`}
+                          >
+                            <div className="flex items-center space-x-1.5 mb-1">
+                              <span
+                                className={`text-[8px] font-black uppercase font-mono px-1.5 py-0.5 rounded ${
+                                  isSelf
+                                    ? "bg-indigo-800 text-indigo-100"
+                                    : isAdmin
+                                    ? "bg-amber-200 text-amber-900"
+                                    : "bg-emerald-100 text-emerald-800"
+                                }`}
+                              >
+                                {isSelf ? "You (Employer)" : isAdmin ? "Welfare Officer (Admin)" : "Worker"}
+                              </span>
+                              <span
+                                className={`text-[9px] font-bold ${
+                                  isSelf ? "text-indigo-200" : "text-slate-500"
+                                }`}
+                              >
+                                {comm.author}
+                              </span>
+                            </div>
+                            <p className="text-xs font-semibold leading-relaxed">{comm.text}</p>
+                            <span
+                              className={`text-[8px] block text-right mt-1 font-mono ${
+                                isSelf ? "text-indigo-200" : "text-slate-400"
+                              }`}
+                            >
+                              {comm.timestamp ? new Date(comm.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Recently"}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="text-center py-10 text-slate-400 text-xs font-mono font-medium">
+                      No active statements submitted in this dispute thread.
+                      <p className="text-[9px] text-slate-400 mt-0.5">Workers and admins can post statements in real-time.</p>
                     </div>
-                  ))}
-                  {(selectedComplaint.comments || []).length === 0 && (
-                    <p className="text-[11px] text-slate-400 font-bold">No statements submitted yet.</p>
                   )}
                 </div>
               </div>

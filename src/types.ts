@@ -24,6 +24,9 @@ export interface UserProfile {
   notifyWagesPush?: boolean;
   notifyWagesSMS?: boolean;
   notifyWagesEmail?: boolean;
+  preShiftReminderEnabled?: boolean;
+  preShiftReminderTime?: string;
+  preShiftReminderMethod?: string;
   shiftsCompleted?: number; // total shift attendance count
   
   // Employer-specific fields
@@ -118,7 +121,7 @@ export interface Complaint {
   status: 'open' | 'investigating' | 'resolved';
   adminNotes?: string;
   createdAt: string;
-  comments?: Array<{ author: string; text: string; timestamp: string; }>;
+  comments?: Array<{ author: string; text: string; timestamp: string; role?: string; }>;
 }
 
 export interface LearningResource {

@@ -22,6 +22,7 @@ import EmergencySOS from "./EmergencySOS";
 import { useToast } from "../context/ToastContext";
 import { useLanguage } from "../context/LanguageContext";
 import WorkerLifecycleFlowchart from "./WorkerLifecycleFlowchart";
+import WageEstimator from "./WageEstimator";
 
 interface WorkerDashboardProps {
   user: UserProfile;
@@ -176,6 +177,21 @@ export default function WorkerDashboard({
     return () => unsubscribe();
   }, []);
 
+  useEffect(() => {
+    if (!user?.uid) return;
+    const q = query(collection(db, "complaints"), where("workerId", "==", user.uid));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list: Complaint[] = [];
+      snapshot.forEach((docSnap) => {
+        list.push({ id: docSnap.id, ...(docSnap.data() as any) } as Complaint);
+      });
+      setComplaints(list);
+    }, (error) => {
+      console.error("Error subscribing to worker complaints:", error);
+    });
+    return () => unsubscribe();
+  }, [user?.uid]);
+
   const renderStatusDot = (uid: string, size: "xs" | "sm" | "md" = "sm") => {
     const profile = userProfiles[uid];
     const status = profile?.statusState || "available"; // default to available as in seed data
@@ -210,6 +226,35 @@ export default function WorkerDashboard({
   const [applications, setApplications] = useState<JobApplication[]>([]);
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [complaints, setComplaints] = useState<Complaint[]>([]);
+  const [selectedComplaintId, setSelectedComplaintId] = useState<string | null>(null);
+  const [workerChatMessage, setWorkerChatMessage] = useState("");
+  const [sendingWorkerChat, setSendingWorkerChat] = useState(false);
+
+  const handleAddWorkerComment = async (complaintId: string) => {
+    if (!workerChatMessage.trim()) return;
+    setSendingWorkerChat(true);
+    try {
+      const cRef = doc(db, "complaints", complaintId);
+      const found = complaints.find(c => c.id === complaintId);
+      if (found) {
+        const comments = [
+          ...(found.comments || []),
+          {
+            author: user.name || "Worker",
+            text: workerChatMessage.trim(),
+            timestamp: new Date().toISOString(),
+            role: "worker"
+          }
+        ];
+        await updateDoc(cRef, { comments });
+        setWorkerChatMessage("");
+      }
+    } catch (err) {
+      console.error("Error adding worker comment:", err);
+    } finally {
+      setSendingWorkerChat(false);
+    }
+  };
   const [learningResources, setLearningResources] = useState<LearningResource[]>([]);
   const [wagePayments, setWagePayments] = useState<WagePayment[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -292,6 +337,46 @@ export default function WorkerDashboard({
   const initialApplicationIds = useRef<Set<string>>(new Set());
   const initialWagePaymentIds = useRef<Set<string>>(new Set());
   const initialAppStatuses = useRef<Record<string, string>>({});
+  const initialNotifsLoaded = useRef(false);
+
+  const markNotificationAsRead = async (notifId: string) => {
+    // Optimistically update local state
+    setNotifications(prev => prev.map(n => n.id === notifId ? { ...n, read: true } : n));
+    
+    // If it is a database-backed notification (not matching hardcoded mock IDs), persist to Firestore
+    const isMock = ["notif-1", "notif-2", "notif-3", "notif-4"].includes(notifId) || notifId.startsWith("wp-paid-");
+    if (!isMock) {
+      try {
+        await updateDoc(doc(db, "notifications", notifId), {
+          read: true
+        });
+      } catch (err) {
+        console.error("Error marking notification as read in Firestore:", err);
+      }
+    }
+  };
+
+  const markAllNotificationsAsRead = async () => {
+    // Optimistically update local state
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    
+    // Query all unread database-backed notifications and mark them as read in Firestore
+    try {
+      const unreadQuery = query(
+        collection(db, "notifications"),
+        where("workerId", "==", user.uid),
+        where("read", "==", false)
+      );
+      const snap = await getDocs(unreadQuery);
+      for (const d of snap.docs) {
+        await updateDoc(doc(db, "notifications", d.id), {
+          read: true
+        });
+      }
+    } catch (err) {
+      console.error("Error marking all notifications as read in Firestore:", err);
+    }
+  };
 
   // Wage History Feed States
   const [wageTimelineFilter, setWageTimelineFilter] = useState<'all' | 'paid' | 'pending' | 'rejected'>('all');
@@ -314,6 +399,9 @@ export default function WorkerDashboard({
   const [notifyWagesPush, setNotifyWagesPush] = useState(user.notifyWagesPush !== false);
   const [notifyWagesSMS, setNotifyWagesSMS] = useState(user.notifyWagesSMS !== false);
   const [notifyWagesEmail, setNotifyWagesEmail] = useState(user.notifyWagesEmail !== false);
+  const [editReminderPref, setEditReminderPref] = useState(user.preShiftReminderEnabled !== false);
+  const [editReminderTime, setEditReminderTime] = useState(user.preShiftReminderTime || "1 hour before");
+  const [editReminderMethod, setEditReminderMethod] = useState(user.preShiftReminderMethod || "In-App Feed");
 
   useEffect(() => {
     if (user) {
@@ -325,6 +413,9 @@ export default function WorkerDashboard({
       setNotifyWagesPush(user.notifyWagesPush !== false);
       setNotifyWagesSMS(user.notifyWagesSMS !== false);
       setNotifyWagesEmail(user.notifyWagesEmail !== false);
+      setEditReminderPref(user.preShiftReminderEnabled !== false);
+      setEditReminderTime(user.preShiftReminderTime || "1 hour before");
+      setEditReminderMethod(user.preShiftReminderMethod || "In-App Feed");
     }
   }, [user]);
 
@@ -616,9 +707,55 @@ export default function WorkerDashboard({
       console.error("Wage payments subscription error:", error);
     });
 
+    // 3. Subscribe to real-time notifications
+    const notifsQuery = query(
+      collection(db, "notifications"),
+      where("workerId", "==", user.uid)
+    );
+    const unsubscribeNotifs = onSnapshot(notifsQuery, (snapshot) => {
+      const dbNotifs: any[] = [];
+      snapshot.forEach((docSnap) => {
+        const d = docSnap.data() as any;
+        dbNotifs.push({
+          id: docSnap.id,
+          title: d.title,
+          message: d.message,
+          date: d.createdAt ? new Date(d.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "Just Now",
+          read: d.read || false,
+          isDb: true
+        });
+      });
+
+      // Handle real-time added notifications for alerts/toasts
+      if (initialNotifsLoaded.current) {
+        snapshot.docChanges().forEach((change) => {
+          if (change.type === "added") {
+            const notifData = change.doc.data() as any;
+            // Trigger toast alert immediately
+            showToast(
+              notifData.message,
+              notifData.type === "wage_disbursed" ? "wage" : "success",
+              notifData.title
+            );
+          }
+        });
+      } else {
+        initialNotifsLoaded.current = true;
+      }
+
+      // Merge db notifications with any local or hardcoded mock ones
+      setNotifications(prev => {
+        const nonDb = prev.filter(n => !n.isDb && !dbNotifs.some(dbN => dbN.title === n.title && dbN.message === n.message));
+        return [...dbNotifs, ...nonDb];
+      });
+    }, (error) => {
+      console.error("Notifications subscription error:", error);
+    });
+
     return () => {
       unsubscribeApps();
       unsubscribeWp();
+      unsubscribeNotifs();
     };
   }, [user]);
 
@@ -861,15 +998,7 @@ export default function WorkerDashboard({
         }
       }
 
-      // 4. Fetch complaints
-      const compSnap = await getDocs(
-        query(collection(db, "complaints"), where("workerId", "==", user.uid))
-      );
-      const compList: Complaint[] = [];
-      compSnap.forEach((doc) => {
-        compList.push({ id: doc.id, ...(doc.data() as any) } as Complaint);
-      });
-      setComplaints(compList);
+      // 4. Fetch complaints (handled in real-time by onSnapshot listener)
 
       // 5. Fetch learning resources
       const lrSnap = await getDocs(collection(db, "learning_resources"));
@@ -3052,6 +3181,9 @@ export default function WorkerDashboard({
                 </div>
               </div>
             </div>
+
+            {/* Interactive Wage Estimator Tool */}
+            <WageEstimator user={user} savingsGoals={savingsGoals} />
           </motion.section>
         )}
 
@@ -3079,7 +3211,7 @@ export default function WorkerDashboard({
                   {notifications.some(n => !n.read) && (
                     <button
                       onClick={() => {
-                        setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+                        markAllNotificationsAsRead();
                         showToast("All notifications marked as read!", "success");
                       }}
                       className="px-2.5 py-1 text-[10px] font-bold text-indigo-700 hover:text-white border border-indigo-200 hover:bg-indigo-600 rounded uppercase tracking-wider cursor-pointer"
@@ -3092,7 +3224,7 @@ export default function WorkerDashboard({
                 <div className="space-y-2.5">
                   {uniqById<any>(notifications).length > 0 ? (
                     uniqById<any>(notifications).map((notif) => {
-                      const isWageDisbursement = notif.title === "💰 Wage Credited" || notif.id.startsWith("wp-paid-");
+                      const isWageDisbursement = notif.title === "💰 Wage Credited" || notif.id.startsWith("wp-paid-") || notif.title === "💰 Wage Disbursed";
                       return (
                         <div
                           key={notif.id}
@@ -3120,7 +3252,7 @@ export default function WorkerDashboard({
                                 <button
                                   onClick={() => {
                                     setActiveTab("worker-earnings");
-                                    setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, read: true } : n));
+                                    markNotificationAsRead(notif.id);
                                   }}
                                   className="px-2 py-1 text-[10px] font-bold text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 rounded border border-emerald-200 transition inline-flex items-center gap-1 cursor-pointer"
                                 >
@@ -3133,7 +3265,7 @@ export default function WorkerDashboard({
                           {!notif.read && (
                             <button
                               onClick={() => {
-                                setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, read: true } : n));
+                                markNotificationAsRead(notif.id);
                               }}
                               className="text-[9px] font-bold text-slate-400 hover:text-slate-800 uppercase shrink-0"
                             >
@@ -3765,8 +3897,6 @@ export default function WorkerDashboard({
                     />
                   </div>
                 </div>
-
-                {/* Alert pref toggle */}
                 <div className="pt-3 border-t border-slate-100 space-y-2">
                   <div className="flex items-start justify-between gap-4">
                     <div className="space-y-1">
@@ -3791,6 +3921,138 @@ export default function WorkerDashboard({
                   </div>
                 </div>
 
+                {/* Pre-Shift Reminders Card */}
+                <div className="p-4 bg-indigo-50/50 border border-indigo-100 rounded-xl space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-5 h-5 text-indigo-650" />
+                    <div>
+                      <h4 className="text-xs font-black text-slate-900 uppercase tracking-tight">Pre-Shift Reminders & Scheduler</h4>
+                      <p className="text-[10px] text-slate-500 font-medium">Configure automatic alarms and checks for upcoming site work</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <label className="text-[10px] font-bold text-slate-700 uppercase tracking-wider block">Enable Reminders</label>
+                        <p className="text-[10px] text-slate-500 font-medium">Automatically receive alarms before your shift starts</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setEditReminderPref(!editReminderPref)}
+                        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
+                          editReminderPref ? "bg-indigo-650" : "bg-slate-200"
+                        }`}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                            editReminderPref ? "translate-x-5" : "translate-x-0"
+                          }`}
+                        />
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-500 block">When to Remind</label>
+                        <select
+                          value={editReminderTime}
+                          disabled={!editReminderPref}
+                          onChange={(e) => setEditReminderTime(e.target.value)}
+                          className="w-full p-2 text-xs border border-slate-200 rounded focus:outline-hidden bg-white text-slate-900 font-bold disabled:opacity-50 cursor-pointer"
+                        >
+                          <option value="30 mins before">30 minutes before</option>
+                          <option value="1 hour before">1 hour before</option>
+                          <option value="2 hours before">2 hours before</option>
+                          <option value="4 hours before">4 hours before</option>
+                          <option value="Day before at 8PM">Day before at 8:00 PM</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-500 block">Notification Route</label>
+                        <select
+                          value={editReminderMethod}
+                          disabled={!editReminderPref}
+                          onChange={(e) => setEditReminderMethod(e.target.value)}
+                          className="w-full p-2 text-xs border border-slate-200 rounded focus:outline-hidden bg-white text-slate-900 font-bold disabled:opacity-50 cursor-pointer"
+                        >
+                          <option value="In-App Feed">In-App Feed Only</option>
+                          <option value="SMS Alert Simulation">SMS Alert (Simulated)</option>
+                          <option value="Both">Both Routes</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Active Upcoming Assignments Status */}
+                    <div className="p-3 bg-white border border-slate-150 rounded-lg text-left">
+                      <span className="text-[9px] font-mono font-bold text-indigo-650 uppercase tracking-wider block mb-2">⚡ Active Pre-Shift Scheduled Reminders</span>
+                      
+                      {(() => {
+                        const upcomingAssignments = applications.filter(app => app.status === "accepted");
+                        if (upcomingAssignments.length === 0) {
+                          return (
+                            <p className="text-[10px] text-slate-400 italic">No upcoming accepted assignments. Apply and get hired for jobs to schedule reminders.</p>
+                          );
+                        }
+
+                        return (
+                          <div className="space-y-2">
+                            {upcomingAssignments.map((app, idx) => (
+                              <div key={`${app.id}-${idx}`} className="flex justify-between items-center text-[10px] border-b border-slate-50 pb-1.5 last:border-0 last:pb-0">
+                                <div className="space-y-0.5 text-left">
+                                  <span className="font-bold text-slate-800">{app.jobTitle}</span>
+                                  <p className="text-[9px] text-slate-500">Employer: {app.employerName}</p>
+                                </div>
+                                <div className="text-right">
+                                  <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-mono text-[8px] font-bold">
+                                    {editReminderPref ? `⏰ Scheduled (${editReminderTime})` : "🔇 Reminders Disabled"}
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })()}
+                    </div>
+
+                    {/* Interactive Sandbox testing tool */}
+                    <div className="pt-2">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            const response = await fetch("/api/scheduler/simulate-reminder", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({
+                                workerId: user.uid,
+                                workerName: user.name,
+                                timePref: editReminderTime,
+                                methodPref: editReminderMethod
+                              })
+                            });
+                            const result = await response.json();
+                            if (result.success) {
+                              showToast(result.message, "success", "Reminder Engine Executed");
+                            } else {
+                              showToast(result.error || "Could not trigger reminder simulation.", "error");
+                            }
+                          } catch (err) {
+                            console.error(err);
+                            showToast("Failed to communicate with scheduler server.", "error");
+                          }
+                        }}
+                        className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-mono text-[10px] font-black uppercase tracking-wider rounded flex items-center justify-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+                      >
+                        <Clock className="w-3.5 h-3.5" />
+                        Run Automatic Pre-Shift Reminder Scan
+                      </button>
+                      <p className="text-[9px] text-center text-slate-400 mt-1">Triggers immediate background scan and delivers your pre-shift alert instantly!</p>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="pt-4 flex justify-end">
                   <button
                     type="button"
@@ -3800,7 +4062,10 @@ export default function WorkerDashboard({
                         phone: editPhone,
                         trade: editTrade,
                         wageExpectation: editWageExpectation,
-                        notificationPrefEnabled: editNotificationPref
+                        notificationPrefEnabled: editNotificationPref,
+                        preShiftReminderEnabled: editReminderPref,
+                        preShiftReminderTime: editReminderTime,
+                        preShiftReminderMethod: editReminderMethod
                       });
                       showToast("Profile settings and notification preferences saved inline!", "success");
                     }}
@@ -4008,8 +4273,8 @@ export default function WorkerDashboard({
               <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-4">
                 <h3 className="font-bold text-xs text-slate-900 uppercase tracking-tight">Your Registered Profile Assets</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {tools.map((t) => (
-                    <div key={t.id} className="p-3 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between">
+                  {tools.map((t, idx) => (
+                    <div key={`${t.id}-${idx}`} className="p-3 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between">
                       <div className="space-y-0.5 text-left">
                         <span className="text-[9px] font-mono font-bold text-indigo-700 bg-indigo-50 border border-indigo-150 px-1.5 py-0.5 rounded uppercase">
                           {t.category}
@@ -4616,8 +4881,8 @@ export default function WorkerDashboard({
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {tradeVideos.map(res => (
-                      <div key={res.id} className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-xs flex flex-col justify-between">
+                    {tradeVideos.map((res, idx) => (
+                      <div key={`${res.id}-${idx}`} className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-xs flex flex-col justify-between">
                         <div>
                           {/* Video embed / visual cover */}
                           {res.type === "video" ? (
@@ -4791,8 +5056,8 @@ export default function WorkerDashboard({
                     className="w-full p-2 text-xs border border-slate-200 rounded bg-white text-slate-700 focus:outline-hidden"
                   >
                     <option value="">-- Choose Job --</option>
-                    {jobs.map(j => (
-                      <option key={j.id} value={j.id}>{j.title}</option>
+                    {jobs.map((j, idx) => (
+                      <option key={`${j.id}-${idx}`} value={j.id}>{j.title}</option>
                     ))}
                   </select>
                 </div>
@@ -4888,6 +5153,126 @@ export default function WorkerDashboard({
                         {c.adminNotes}
                       </div>
                     )}
+
+                    {/* Expandable Mediation Chat Client */}
+                    <div className="pt-2.5 border-t border-slate-200/60 mt-3.5">
+                      <div className="flex justify-between items-center">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedComplaintId(selectedComplaintId === c.id ? null : c.id)}
+                          className="text-[10px] font-black uppercase text-slate-900 hover:text-slate-700 flex items-center gap-1.5 cursor-pointer bg-white px-2.5 py-1 rounded border border-slate-200 hover:bg-slate-50 transition-colors"
+                        >
+                          <MessageSquare className="w-3.5 h-3.5 text-slate-800 animate-pulse" />
+                          {selectedComplaintId === c.id ? "Close Chat Room" : `Open Mediation Chat Room (${c.comments?.length || 0})`}
+                        </button>
+                        <span className="text-[9px] text-slate-400 font-mono font-bold uppercase">ID: #{c.id.slice(0, 8)}</span>
+                      </div>
+
+                      {selectedComplaintId === c.id && (
+                        <div className="mt-3.5 bg-white border border-slate-200/80 rounded-xl p-4 space-y-3.5 shadow-2xs">
+                          <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                            <span className="text-[9px] font-black uppercase text-slate-400 tracking-wider font-mono">Mediation Chat Stream</span>
+                            <span className="bg-emerald-50 text-emerald-800 text-[9px] font-bold font-mono px-2 py-0.5 rounded uppercase">Real-Time Channel</span>
+                          </div>
+
+                          {/* Chat Bubbles */}
+                          <div className="space-y-3 max-h-56 overflow-y-auto p-2 bg-slate-50 rounded-lg border border-slate-100">
+                            {c.comments && c.comments.length > 0 ? (
+                              c.comments.map((comm, idx) => {
+                                const isSelf = comm.role === "worker";
+                                const isAdmin = comm.role === "admin";
+                                const isEmployer = comm.role === "employer" || (!isSelf && !isAdmin);
+
+                                return (
+                                  <div
+                                    key={idx}
+                                    className={`flex flex-col ${
+                                      isSelf ? "items-end" : isAdmin ? "items-center" : "items-start"
+                                    }`}
+                                  >
+                                    <div
+                                      className={`max-w-[85%] rounded-2xl p-2.5 shadow-2xs ${
+                                        isSelf
+                                          ? "bg-slate-900 text-white rounded-tr-none"
+                                          : isAdmin
+                                          ? "bg-amber-50 border border-amber-200 text-slate-900"
+                                          : "bg-white border border-slate-200 text-slate-900 rounded-tl-none"
+                                      }`}
+                                    >
+                                      <div className="flex items-center space-x-1.5 mb-1.5">
+                                        <span
+                                          className={`text-[8px] font-black uppercase font-mono px-1.5 py-0.5 rounded ${
+                                            isSelf
+                                              ? "bg-slate-850 text-slate-100"
+                                              : isAdmin
+                                              ? "bg-amber-200 text-amber-900"
+                                              : "bg-indigo-100 text-indigo-800"
+                                          }`}
+                                        >
+                                          {isSelf ? "You (Worker)" : isAdmin ? "Welfare Officer (Admin)" : "Employer"}
+                                        </span>
+                                        <span
+                                          className={`text-[9px] font-bold ${
+                                            isSelf ? "text-slate-300" : "text-slate-500"
+                                          }`}
+                                        >
+                                          {comm.author}
+                                        </span>
+                                      </div>
+                                      <p className="text-xs font-medium leading-relaxed">{comm.text}</p>
+                                      <span
+                                        className={`text-[8px] block text-right mt-1 font-mono ${
+                                          isSelf ? "text-slate-400" : "text-slate-400"
+                                        }`}
+                                      >
+                                        {comm.timestamp ? new Date(comm.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Recently"}
+                                      </span>
+                                    </div>
+                                  </div>
+                                );
+                              })
+                            ) : (
+                              <div className="text-center py-8 text-slate-400 text-xs font-mono">
+                                No active messages in this dispute thread.
+                                <p className="text-[10px] text-slate-400 mt-0.5">Post statements to document or discuss.</p>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Chat Input */}
+                          {c.status !== "resolved" ? (
+                            <form
+                              onSubmit={(e) => {
+                                e.preventDefault();
+                                handleAddWorkerComment(c.id);
+                              }}
+                              className="flex items-center space-x-2 pt-1"
+                            >
+                              <input
+                                type="text"
+                                value={workerChatMessage}
+                                onChange={(e) => setWorkerChatMessage(e.target.value)}
+                                placeholder="Write a message to employer and mediator..."
+                                className="flex-1 px-3 py-2 text-xs border border-slate-200 rounded-lg bg-slate-50 text-slate-900 font-semibold focus:outline-none focus:border-slate-800 focus:bg-white transition-all animate-none"
+                                required
+                                disabled={sendingWorkerChat}
+                              />
+                              <button
+                                type="submit"
+                                disabled={sendingWorkerChat || !workerChatMessage.trim()}
+                                className="p-2 bg-slate-900 hover:bg-slate-850 text-amber-500 rounded-lg border border-slate-950 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                              >
+                                <Send className="w-3.5 h-3.5" />
+                              </button>
+                            </form>
+                          ) : (
+                            <div className="p-2.5 bg-emerald-50 border border-emerald-100 rounded-lg text-center text-[10px] text-emerald-800 font-black uppercase font-mono tracking-wider">
+                              ✅ Case resolved by Welfare Officer. Chat history locked.
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ))
               ) : (

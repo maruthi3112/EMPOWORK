@@ -172,6 +172,22 @@
         "createdAt": { "type": "string" }
       },
       "required": ["id", "workerId", "workerName", "employerId", "employerName", "jobId", "rating", "createdAt"]
+    },
+    "Notification": {
+      "title": "Real-time Notification",
+      "description": "App notification alerts for workers",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "workerId": { "type": "string" },
+        "employerId": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "type": { "type": "string" },
+        "read": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "workerId", "title", "message", "read", "createdAt"]
     }
   },
   "firestore": {
@@ -210,6 +226,10 @@
     "reviews": {
       "schema": "Review",
       "description": "Employer reviews and ratings for workers"
+    },
+    "notifications": {
+      "schema": "Notification",
+      "description": "Real-time app notifications for workers"
     }
   }
 }

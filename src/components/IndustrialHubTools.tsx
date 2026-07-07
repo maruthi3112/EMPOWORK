@@ -2,7 +2,8 @@ import React, { useState } from "react";
 import { 
   Calculator, HardHat, ShieldAlert, Thermometer, Construction,
   Briefcase, Coins, Layers, Users, CheckCircle, Info, Sparkles,
-  Flame, Zap, Shield, Check, ClipboardCheck, RefreshCw, AlertTriangle
+  Flame, Zap, Shield, Check, ClipboardCheck, RefreshCw, AlertTriangle,
+  Wrench, Paintbrush, Moon, Plus, Minus, Copy, FileText
 } from "lucide-react";
 
 const taskSafetyChecklists = {
@@ -85,18 +86,114 @@ const taskSafetyChecklists = {
       "Enforce safety leather aprons, welding sleeves, and flame-resistant spats are worn",
       "Ensure a dedicated fire-watch helper is stationed with a ready extinguisher during hot cuts"
     ]
+  },
+  plumbing: {
+    title: "Plumbing & Hydraulics",
+    icon: Wrench,
+    iconColor: "text-blue-500",
+    bgLight: "bg-blue-500/10",
+    borderTheme: "border-blue-200/60",
+    badgeTheme: "bg-blue-100 text-blue-800",
+    items: [
+      "Verify pipe pressure testing zone is barricaded and cleared of bystander workers",
+      "Inspect trench wall shoring for depth > 1.2m to prevent cave-in hazards",
+      "Confirm heavy pipe lifters and sling straps are certified for load bearing",
+      "Ensure flame shields are mounted during copper pipe soldering/hot joint operations",
+      "Verify chemical safety sheets (MSDS) are on site for PVC pipe solvent cements",
+      "Ensure eye wash kits are accessible near solvent gluing stations"
+    ]
+  },
+  painting: {
+    title: "Painting & Coating",
+    icon: Paintbrush,
+    iconColor: "text-purple-500",
+    bgLight: "bg-purple-500/10",
+    borderTheme: "border-purple-200/60",
+    badgeTheme: "bg-purple-100 text-purple-800",
+    items: [
+      "Verify painters are wearing high-efficiency respirators for VOC paint spraying",
+      "Confirm safety ropes and cradle lifts are safety-inspected for high wall painting",
+      "Ensure paint cans are stored in a designated, ventilated, fire-safe cabinet",
+      "Verify plastic sheet drops are taped to avoid slipping hazards on wet surfaces",
+      "Check for availability of skin-safe cleansers for paint removal"
+    ]
+  },
+  rebar: {
+    title: "Rebar & Bar Bending",
+    icon: Construction,
+    iconColor: "text-teal-500",
+    bgLight: "bg-teal-500/10",
+    borderTheme: "border-teal-200/60",
+    badgeTheme: "bg-teal-100 text-teal-800",
+    items: [
+      "Ensure bar bending machine guards are intact and operating smoothly",
+      "Check that workers wear heavy duty leather gloves to handle raw sharp rebars",
+      "Confirm cap installation on all upward pointing starter bars on columns",
+      "Verify tie-wire spools are clipped to utility belts to prevent tripping",
+      "Establish a designated rebar stacking zone with safe passage corridors"
+    ]
+  },
+  supervision: {
+    title: "Supervision & Layout",
+    icon: ClipboardCheck,
+    iconColor: "text-indigo-500",
+    bgLight: "bg-indigo-500/10",
+    borderTheme: "border-indigo-200/60",
+    badgeTheme: "bg-indigo-100 text-indigo-800",
+    items: [
+      "Perform morning tool-box talk with all crews on high-risk tasks",
+      "Check permit-to-work logs for active altitude or electrical works",
+      "Confirm emergency assembly points are clear and well marked",
+      "Verify that first aid kits are stocked with fresh bandages and antiseptic",
+      "Inspect temporary power distribution boards for active earth fault trips"
+    ]
   }
+};
+
+const baseRates = {
+  helper: 450,
+  mason: 750,
+  carpenter: 800,
+  electrician: 850,
+  welder: 900,
+  plumber: 720,
+  painter: 680,
+  bar_bender: 820,
+  scaffolder: 750,
+  concrete_operator: 780,
+  supervisor: 1100
 };
 
 export default function IndustrialHubTools() {
   // Selected Sub-tool state
-  const [activeTool, setActiveTool] = useState<"estimator" | "materials" | "safety">("estimator");
+  const [activeTool, setActiveTool] = useState<"estimator" | "materials" | "safety" | "crew">("estimator");
 
   // Wage Estimator State
-  const [trade, setTrade] = useState<"helper" | "mason" | "carpenter" | "electrician" | "welder">("mason");
+  const [trade, setTrade] = useState<keyof typeof baseRates>("mason");
   const [hours, setHours] = useState(8);
   const [overtime, setOvertime] = useState(2);
   const [siteHazardLevel, setSiteHazardLevel] = useState<"standard" | "high-altitude" | "demolition">("standard");
+  const [nightShift, setNightShift] = useState(false);
+  const [travelAllowance, setTravelAllowance] = useState(100); // INR per day
+  const [mealAllowance, setMealAllowance] = useState(true); // INR 50/day standard subsidy
+
+  // Crew Planner State
+  const [crewDuration, setCrewDuration] = useState(7); // Days
+  const [crewSizes, setCrewSizes] = useState<Record<keyof typeof baseRates, number>>({
+    helper: 5,
+    mason: 2,
+    carpenter: 1,
+    electrician: 1,
+    welder: 0,
+    plumber: 1,
+    painter: 1,
+    bar_bender: 2,
+    scaffolder: 1,
+    concrete_operator: 1,
+    supervisor: 1
+  });
+
+  const [copiedProposal, setCopiedProposal] = useState(false);
 
   // Material & Effort State
   const [wallLength, setWallLength] = useState<number | "">(30); // in feet
@@ -112,15 +209,6 @@ export default function IndustrialHubTools() {
   const [selectedSafetyCategory, setSelectedSafetyCategory] = useState<keyof typeof taskSafetyChecklists>("masonry");
   const [checkedSafetyItems, setCheckedSafetyItems] = useState<Record<string, boolean>>({});
 
-  // --- Calculations for Estimator ---
-  const baseRates = {
-    helper: 450,
-    mason: 750,
-    carpenter: 800,
-    electrician: 850,
-    welder: 900
-  };
-
   const calculateDailyEarnings = () => {
     const base = baseRates[trade];
     const hourlyRate = base / 8;
@@ -133,8 +221,33 @@ export default function IndustrialHubTools() {
     if (siteHazardLevel === "high-altitude") hazardBonus = base * 0.15; // 15% risk premium
     if (siteHazardLevel === "demolition") hazardBonus = base * 0.25;    // 25% hazard pay
     
-    return Math.round(normalHoursPay + extraHoursPay + hazardBonus);
+    const nightShiftBonus = nightShift ? base * 0.20 : 0;
+    const mealPay = mealAllowance ? 50 : 0;
+    
+    return Math.round(normalHoursPay + extraHoursPay + hazardBonus + nightShiftBonus + travelAllowance + mealPay);
   };
+
+  const calculateCrewTotal = () => {
+    let totalWages = 0;
+    (Object.keys(baseRates) as Array<keyof typeof baseRates>).forEach((role) => {
+      const size = crewSizes[role] || 0;
+      const rate = baseRates[role];
+      totalWages += size * rate * crewDuration;
+    });
+
+    const standardWelfareTax = totalWages * 0.05; // 5% welfare cess / insurance fund
+    const insuranceCess = totalWages * 0.02; // 2% safety premium
+    const grandTotal = totalWages + standardWelfareTax + insuranceCess;
+
+    return {
+      totalWages,
+      standardWelfareTax,
+      insuranceCess,
+      grandTotal
+    };
+  };
+
+  const crewCost = calculateCrewTotal();
 
   // --- Calculations for Construction Material/Labor Planner ---
   // Indian Standard Code guidelines for brickwork estimation:
@@ -182,22 +295,23 @@ export default function IndustrialHubTools() {
   return (
     <div className="w-full bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col">
       {/* Header Bar */}
-      <div className="bg-slate-900 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div className="space-y-0.5">
+      <div className="bg-slate-900 px-6 py-5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 border-b border-slate-800">
+        <div className="space-y-1">
           <div className="flex items-center space-x-2">
-            <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-            <span className="font-mono text-[10px] font-bold text-amber-400 tracking-wider uppercase">
-              Operational Hub
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse" />
+            <span className="font-mono text-[10px] font-black text-amber-400 tracking-wider uppercase">
+              Operational Hub & Estimator Suite
             </span>
           </div>
-          <h3 className="text-white font-black text-lg flex items-center">
-            <Construction className="w-5 h-5 mr-2 text-amber-500" />
+          <h3 className="text-white font-black text-xl flex items-center">
+            <Construction className="w-6 h-6 mr-2.5 text-amber-500" />
             Industrial Site Utilities & Estimators
           </h3>
+          <p className="text-[11px] text-slate-400 font-medium">Configure daily wages, brickwork materials, site safety clearance, and full crew budgets.</p>
         </div>
 
         {/* Tab Selectors */}
-        <div className="flex bg-slate-800 p-1 rounded-xl text-xs font-bold uppercase tracking-wider font-mono">
+        <div className="flex flex-wrap gap-1 bg-slate-800 p-1 rounded-xl text-xs font-bold uppercase tracking-wider font-mono">
           <button
             onClick={() => setActiveTool("estimator")}
             className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center ${
@@ -231,6 +345,17 @@ export default function IndustrialHubTools() {
             <HardHat className="w-3.5 h-3.5 mr-1" />
             Safety Gear
           </button>
+          <button
+            onClick={() => setActiveTool("crew")}
+            className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center ${
+              activeTool === "crew"
+                ? "bg-amber-500 text-slate-950 font-black shadow-sm"
+                : "text-slate-400 hover:text-white"
+            }`}
+          >
+            <Users className="w-3.5 h-3.5 mr-1" />
+            Crew Planner
+          </button>
         </div>
       </div>
 
@@ -241,33 +366,49 @@ export default function IndustrialHubTools() {
         {activeTool === "estimator" && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
             {/* Input Side */}
-            <div className="lg:col-span-7 space-y-4">
+            <div className="lg:col-span-7 space-y-6">
               <div>
                 <label className="block text-[11px] font-black uppercase text-slate-500 tracking-wider font-mono mb-2">
                   Select Trade Specialty & Base Skill
                 </label>
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                  {(Object.keys(baseRates) as Array<keyof typeof baseRates>).map((t) => (
-                    <button
-                      key={t}
-                      onClick={() => setTrade(t)}
-                      className={`py-2 px-1 rounded-xl text-[11px] font-bold uppercase font-mono tracking-wider transition-all border cursor-pointer ${
-                        trade === t
-                          ? "bg-amber-50 border-amber-300 text-amber-900 font-black shadow-xs"
-                          : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
-                      }`}
-                    >
-                      {t}
-                      <span className="block text-[9px] text-slate-400 font-normal normal-case">
-                        ₹{baseRates[t]}/day
-                      </span>
-                    </button>
-                  ))}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {(Object.keys(baseRates) as Array<keyof typeof baseRates>).map((t) => {
+                    const labelMap: Record<string, string> = {
+                      helper: "Helper (सहायक)",
+                      mason: "Mason (राजमिस्त्री)",
+                      carpenter: "Carpenter (बढ़ई)",
+                      electrician: "Electrician (बिजली)",
+                      welder: "Welder (वेल्डर)",
+                      plumber: "Plumber (नलसाज)",
+                      painter: "Painter (चित्रकार)",
+                      bar_bender: "Rebar (सरिया)",
+                      scaffolder: "Scaffolder (पाड़)",
+                      concrete_operator: "Concrete (कंक्रीट)",
+                      supervisor: "Supervisor (सुपरवाइजर)"
+                    };
+                    return (
+                      <button
+                        key={t}
+                        onClick={() => setTrade(t)}
+                        className={`py-2 px-1.5 rounded-xl text-[10px] font-black uppercase font-mono tracking-tight transition-all border cursor-pointer text-center flex flex-col justify-between h-14 ${
+                          trade === t
+                            ? "bg-amber-50 border-amber-400 text-amber-900 font-black shadow-xs"
+                            : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+                        }`}
+                      >
+                        <span className="truncate w-full">{labelMap[t] || t}</span>
+                        <span className="block text-[9px] text-slate-500 font-bold font-mono">
+                          ₹{baseRates[t]}/day
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
+              {/* Shift Hours sliders */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1">
+                <div className="space-y-1 bg-slate-50 p-3 rounded-xl border border-slate-150">
                   <div className="flex justify-between text-xs font-bold text-slate-600 font-mono">
                     <span className="uppercase">Normal Shift Hours</span>
                     <span className="text-amber-600">{hours} Hours</span>
@@ -278,11 +419,12 @@ export default function IndustrialHubTools() {
                     max="8"
                     value={hours}
                     onChange={(e) => setHours(Number(e.target.value))}
-                    className="w-full h-1.5 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-slate-900"
+                    className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-slate-900"
                   />
+                  <p className="text-[9px] text-slate-400 font-medium">Standard legal day is 8 working hours.</p>
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-1 bg-slate-50 p-3 rounded-xl border border-slate-150">
                   <div className="flex justify-between text-xs font-bold text-slate-600 font-mono">
                     <span className="uppercase">Overtime Work</span>
                     <span className="text-amber-600">{overtime} Hours (1.5x)</span>
@@ -293,8 +435,63 @@ export default function IndustrialHubTools() {
                     max="6"
                     value={overtime}
                     onChange={(e) => setOvertime(Number(e.target.value))}
-                    className="w-full h-1.5 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-slate-900"
+                    className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-slate-900"
                   />
+                  <p className="text-[9px] text-slate-400 font-medium">Overtime is disbursed at 1.5 times the base rate.</p>
+                </div>
+              </div>
+
+              {/* Extra allowances */}
+              <div className="p-4 border border-slate-200 rounded-2xl bg-slate-50 space-y-4">
+                <span className="block text-[11px] font-black uppercase text-slate-500 tracking-wider font-mono">
+                  Additional Compensations & Allowances
+                </span>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <label className="flex items-center space-x-2.5 bg-white p-3 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-100/50 select-none">
+                    <input
+                      type="checkbox"
+                      checked={nightShift}
+                      onChange={(e) => setNightShift(e.target.checked)}
+                      className="w-4 h-4 text-amber-500 rounded border-slate-300 focus:ring-amber-500 cursor-pointer"
+                    />
+                    <div className="text-left">
+                      <span className="font-bold text-xs text-slate-700 flex items-center gap-1 font-mono uppercase">
+                        <Moon className="w-3.5 h-3.5 text-indigo-500" /> Night Shift
+                      </span>
+                      <span className="text-[9px] text-slate-400 block font-medium">+20% rate premium</span>
+                    </div>
+                  </label>
+
+                  <label className="flex items-center space-x-2.5 bg-white p-3 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-100/50 select-none">
+                    <input
+                      type="checkbox"
+                      checked={mealAllowance}
+                      onChange={(e) => setMealAllowance(e.target.checked)}
+                      className="w-4 h-4 text-amber-500 rounded border-slate-300 focus:ring-amber-500 cursor-pointer"
+                    />
+                    <div className="text-left">
+                      <span className="font-bold text-xs text-slate-700 block font-mono uppercase">Meal Subsidy</span>
+                      <span className="text-[9px] text-slate-400 block font-medium">₹50 daily food token</span>
+                    </div>
+                  </label>
+
+                  <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-1">
+                    <div className="flex justify-between text-[11px] font-bold text-slate-600 font-mono">
+                      <span className="uppercase">Travel:</span>
+                      <span className="text-emerald-600">₹{travelAllowance}</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="250"
+                      step="50"
+                      value={travelAllowance}
+                      onChange={(e) => setTravelAllowance(Number(e.target.value))}
+                      className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-slate-900"
+                    />
+                    <span className="block text-[8px] text-slate-400">Daily commuting allowance</span>
+                  </div>
                 </div>
               </div>
 
@@ -319,7 +516,7 @@ export default function IndustrialHubTools() {
                     onClick={() => setSiteHazardLevel("high-altitude")}
                     className={`p-2.5 rounded-xl text-left border cursor-pointer transition-all ${
                       siteHazardLevel === "high-altitude"
-                        ? "bg-amber-500 border-amber-600 text-slate-950"
+                        ? "bg-amber-500 border-amber-600 text-slate-950 font-black shadow-xs"
                         : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
                     }`}
                   >
@@ -361,7 +558,7 @@ export default function IndustrialHubTools() {
                   </span>
                 </div>
 
-                <div className="border-t border-slate-200/80 pt-4 space-y-2 text-xs font-medium text-slate-600">
+                <div className="border-t border-slate-200/80 pt-4 space-y-2.5 text-xs font-medium text-slate-600">
                   <div className="flex justify-between">
                     <span>Base Daily Rate ({trade}):</span>
                     <span className="font-mono text-slate-900 font-bold">₹{baseRates[trade]}</span>
@@ -382,6 +579,24 @@ export default function IndustrialHubTools() {
                           ? baseRates[trade] * 0.25 
                           : 0
                       )}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Night Shift Premium (20%):</span>
+                    <span className="font-mono text-slate-900 font-bold">
+                      +₹{nightShift ? Math.round(baseRates[trade] * 0.20) : 0}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Meal Token / Subsidy:</span>
+                    <span className="font-mono text-slate-900 font-bold">
+                      +₹{mealAllowance ? 50 : 0}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Commuter Travel Allowance:</span>
+                    <span className="font-mono text-slate-900 font-bold">
+                      +₹{travelAllowance}
                     </span>
                   </div>
                 </div>
@@ -957,6 +1172,315 @@ export default function IndustrialHubTools() {
                     </div>
                   </div>
                 )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Workspace 4: Crew Planner & Budget Suite */}
+        {activeTool === "crew" && (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 text-left animate-in fade-in duration-300">
+            {/* Input Side */}
+            <div className="lg:col-span-7 space-y-6">
+              <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <div>
+                    <h4 className="text-xs font-black uppercase text-slate-950 font-mono tracking-tight">
+                      Configure Crew Composition
+                    </h4>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase font-mono tracking-wide">
+                      Set workforce counts across active specialties
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setCrewSizes({
+                        helper: 0,
+                        mason: 0,
+                        carpenter: 0,
+                        electrician: 0,
+                        welder: 0,
+                        plumber: 0,
+                        painter: 0,
+                        bar_bender: 0,
+                        scaffolder: 0,
+                        concrete_operator: 0,
+                        supervisor: 0
+                      });
+                    }}
+                    className="text-[10px] font-bold text-slate-500 hover:text-rose-600 uppercase font-mono flex items-center space-x-1 cursor-pointer transition-colors"
+                  >
+                    <span>Clear All</span>
+                  </button>
+                </div>
+
+                {/* Grid layout for crew configuration */}
+                <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
+                  {(Object.keys(baseRates) as Array<keyof typeof baseRates>).map((role) => {
+                    const count = crewSizes[role] || 0;
+                    
+                    const tradeInfo: Record<string, { label: string; details: string; icon: any; color: string }> = {
+                      helper: { label: "General Helper", details: "Site clearing, loading, and mixing assistant", icon: Users, color: "text-slate-500 bg-slate-50" },
+                      mason: { label: "Mason / Mistri", details: "Bricklaying, plastering, and structural finishing", icon: Construction, color: "text-amber-500 bg-amber-50" },
+                      carpenter: { label: "Carpenter / Carpenter Shutterer", details: "Timber shuttering and centering setup", icon: Layers, color: "text-amber-700 bg-amber-50" },
+                      electrician: { label: "Electrician / Wireman", details: "Conduiting, wiring and distribution panels", icon: Zap, color: "text-yellow-500 bg-yellow-50" },
+                      welder: { label: "Welder / Fabricator", details: "Hot-cut welding and iron grill structures", icon: Flame, color: "text-red-500 bg-red-50" },
+                      plumber: { label: "Plumber / Pipefitter", details: "Sewerage, drainage layouts, and sanitaries", icon: Wrench, color: "text-blue-500 bg-blue-50" },
+                      painter: { label: "Painter / Wall Finisher", details: "Exterior coating and paint primers", icon: Paintbrush, color: "text-purple-500 bg-purple-50" },
+                      bar_bender: { label: "Rebar / Bar Bender", details: "Slab steel tying and column framing", icon: Construction, color: "text-teal-500 bg-teal-50" },
+                      scaffolder: { label: "Scaffolder", details: "Altitude steel pipe framing setups", icon: HardHat, color: "text-sky-500 bg-sky-50" },
+                      concrete_operator: { label: "Concrete Mixer Operator", details: "Batching machine loading & handling", icon: Layers, color: "text-emerald-500 bg-emerald-50" },
+                      supervisor: { label: "Site Supervisor", details: "Site safety clearance and attendance logs", icon: ClipboardCheck, color: "text-indigo-500 bg-indigo-50" }
+                    };
+
+                    const info = tradeInfo[role];
+                    const Icon = info.icon;
+
+                    return (
+                      <div 
+                        key={role} 
+                        className="flex items-center justify-between p-3 rounded-xl border border-slate-150 bg-slate-50/50 hover:bg-slate-50 transition-all"
+                      >
+                        <div className="flex items-center space-x-3 truncate">
+                          <div className={`p-2 rounded-lg ${info.color} shrink-0`}>
+                            <Icon className="w-4 h-4" />
+                          </div>
+                          <div className="truncate text-left">
+                            <span className="font-bold text-xs text-slate-900 block font-mono uppercase">
+                              {info.label}
+                            </span>
+                            <span className="text-[10px] text-slate-400 font-medium block truncate max-w-[280px]">
+                              {info.details}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center space-x-3 shrink-0">
+                          <span className="font-mono text-xs font-bold text-slate-500">
+                            ₹{baseRates[role]}/day
+                          </span>
+                          
+                          <div className="flex items-center bg-white border border-slate-200 rounded-lg p-1 space-x-1.5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setCrewSizes(prev => ({
+                                  ...prev,
+                                  [role]: Math.max(0, count - 1)
+                                }));
+                              }}
+                              className="w-6 h-6 rounded flex items-center justify-center hover:bg-slate-100 cursor-pointer text-slate-600 transition-colors"
+                            >
+                              <Minus className="w-3 h-3" />
+                            </button>
+                            <span className="w-5 text-center font-mono text-xs font-black text-slate-950">
+                              {count}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setCrewSizes(prev => ({
+                                  ...prev,
+                                  [role]: Math.min(20, count + 1)
+                                }));
+                              }}
+                              className="w-6 h-6 rounded flex items-center justify-center hover:bg-slate-100 cursor-pointer text-slate-600 transition-colors"
+                            >
+                              <Plus className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Crew Duration Selection */}
+              <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h4 className="text-xs font-black uppercase text-slate-950 font-mono tracking-tight">
+                      Estimate Duration
+                    </h4>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase font-mono tracking-wide">
+                      Define overall project working days
+                    </p>
+                  </div>
+                  <span className="bg-amber-100 text-amber-900 text-xs font-mono font-black px-2.5 py-1 rounded-lg">
+                    {crewDuration} Working Days
+                  </span>
+                </div>
+
+                <input
+                  type="range"
+                  min="1"
+                  max="90"
+                  value={crewDuration}
+                  onChange={(e) => setCrewDuration(Number(e.target.value))}
+                  className="w-full h-1.5 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-slate-900"
+                />
+
+                <div className="grid grid-cols-4 gap-2 pt-1">
+                  {[
+                    { label: "1 Day (शुरुआती)", d: 1 },
+                    { label: "1 Week (1 हफ्ता)", d: 7 },
+                    { label: "2 Weeks (2 हफ्ता)", d: 15 },
+                    { label: "1 Month (1 महीना)", d: 30 }
+                  ].map((preset) => (
+                    <button
+                      key={preset.label}
+                      type="button"
+                      onClick={() => setCrewDuration(preset.d)}
+                      className={`py-1.5 rounded-lg border text-center transition-all cursor-pointer font-mono text-[9px] font-black uppercase ${
+                        crewDuration === preset.d
+                          ? "bg-slate-900 text-white border-slate-950"
+                          : "bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-600"
+                      }`}
+                    >
+                      {preset.label.split(" (")[0]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Proposal / Bill Display Side */}
+            <div className="lg:col-span-5 bg-slate-50 border border-slate-200 rounded-2xl p-5 flex flex-col justify-between space-y-6">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+                  <span className="text-xs font-black uppercase text-slate-800 font-mono tracking-wider flex items-center">
+                    <FileText className="w-4 h-4 mr-1.5 text-slate-500" /> Crew Budget Sheet
+                  </span>
+                  <span className="bg-emerald-100 text-emerald-800 text-[9px] font-black uppercase tracking-wider font-mono px-2 py-0.5 rounded-full">
+                    Quote Calculated
+                  </span>
+                </div>
+
+                {/* Invoice-style layout */}
+                <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-2xs space-y-4 text-xs font-mono">
+                  <div className="border-b border-dashed border-slate-200 pb-3 space-y-1 text-slate-500 text-[10px]">
+                    <div className="flex justify-between">
+                      <span>PROJECT NO:</span>
+                      <span className="text-slate-800 font-bold">EMPO-PRJ-2026</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>DURATION:</span>
+                      <span className="text-slate-800 font-bold">{crewDuration} working days</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 max-h-48 overflow-y-auto divide-y divide-slate-100 pr-1">
+                    {Object.values(crewSizes).some((count) => Number(count) > 0) ? (
+                      (Object.keys(baseRates) as Array<keyof typeof baseRates>).map((role) => {
+                        const size = crewSizes[role] || 0;
+                        if (size === 0) return null;
+                        const lineCost = size * baseRates[role] * crewDuration;
+                        return (
+                          <div key={role} className="flex justify-between text-[11px] pt-2 text-slate-700">
+                            <div>
+                              <span className="font-bold text-slate-900 block capitalize">{role.replace("_", " ")}</span>
+                              <span className="text-[10px] text-slate-400">({size} x ₹{baseRates[role]}/day)</span>
+                            </div>
+                            <span className="font-bold text-slate-900">₹{lineCost.toLocaleString()}</span>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="text-center py-6 text-slate-400 text-[11px] font-medium uppercase font-mono">
+                        No active crew members selected.
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="border-t border-dashed border-slate-200 pt-3 space-y-2 text-[11px] text-slate-600">
+                    <div className="flex justify-between">
+                      <span>Subtotal Base Wages:</span>
+                      <span className="font-bold text-slate-900">₹{crewCost.totalWages.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Labor Welfare Cess (5%):</span>
+                      <span className="font-bold text-slate-900">+₹{crewCost.standardWelfareTax.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Accident Insurance Fund (2%):</span>
+                      <span className="font-bold text-slate-900">+₹{crewCost.insuranceCess.toLocaleString()}</span>
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-900 rounded-lg p-3 text-white flex justify-between items-center">
+                    <div>
+                      <span className="text-[9px] font-black uppercase text-amber-400 tracking-wider block font-mono leading-none">
+                        GRAND TOTAL BUDGET
+                      </span>
+                      <span className="text-[8px] text-slate-400 mt-0.5 block">Estimated labor clearances</span>
+                    </div>
+                    <span className="text-base font-black text-amber-400">
+                      ₹{Math.round(crewCost.grandTotal).toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Interactive clipboard copy */}
+              <div className="space-y-2.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    let breakdownText = "";
+                    (Object.keys(baseRates) as Array<keyof typeof baseRates>).forEach((role) => {
+                      const size = crewSizes[role] || 0;
+                      if (size > 0) {
+                        const rate = baseRates[role];
+                        const total = size * rate * crewDuration;
+                        breakdownText += `- ${role.replace("_", " ").toUpperCase()}: ${size} workers @ ₹${rate}/day for ${crewDuration} days = ₹${total.toLocaleString()}\n`;
+                      }
+                    });
+
+                    const text = `=========================================
+OFFICIAL LABOR COST ESTIMATE & PROPOSAL
+Operational Hub - Empowork Utilities
+=========================================
+Project Duration: ${crewDuration} Working Days
+-----------------------------------------
+Crew Breakdown:
+${breakdownText || "No crew members selected.\n"}
+-----------------------------------------
+Subtotal Wages:  ₹${crewCost.totalWages.toLocaleString()}
+Welfare Cess (5%): ₹${crewCost.standardWelfareTax.toLocaleString()}
+Accident Insurance (2%): ₹${crewCost.insuranceCess.toLocaleString()}
+-----------------------------------------
+GRAND TOTAL ESTIMATE: ₹${Math.round(crewCost.grandTotal).toLocaleString()}
+=========================================
+Generated on: ${new Date().toLocaleDateString()}
+Empowork Digital Clearance Portal`;
+
+                    navigator.clipboard.writeText(text);
+                    setCopiedProposal(true);
+                    setTimeout(() => setCopiedProposal(false), 2500);
+                  }}
+                  className={`w-full py-3 px-4 rounded-xl font-bold font-mono text-xs uppercase cursor-pointer transition-all flex items-center justify-center space-x-2 border shadow-2xs ${
+                    copiedProposal
+                      ? "bg-emerald-500 text-white border-emerald-600 shadow-md"
+                      : "bg-slate-900 text-white hover:bg-slate-800 border-slate-950"
+                  }`}
+                >
+                  {copiedProposal ? (
+                    <>
+                      <CheckCircle className="w-4 h-4" />
+                      <span>Copied Proposal! (प्रस्ताव कॉपी हो गया)</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-4 h-4" />
+                      <span>Copy Formal Cost Proposal (प्रस्ताव कॉपी करें)</span>
+                    </>
+                  )}
+                </button>
+
+                <p className="text-[10px] text-slate-500 leading-normal font-mono text-center">
+                  Approved proposal cost logs are registered under central public welfare schemes to ensure strict regulatory compliance.
+                </p>
               </div>
             </div>
           </div>

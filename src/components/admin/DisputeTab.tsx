@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { 
   MessageSquare, Scale, Brain, AlertOctagon, CheckCircle2, ChevronRight, 
-  RotateCcw, ShieldCheck, Wand2, Star, Sparkles, Activity, FileText, CheckSquare, Square, Check, AlertCircle
+  RotateCcw, ShieldCheck, Wand2, Star, Sparkles, Activity, FileText, CheckSquare, Square, Check, AlertCircle,
+  Send, Users, User
 } from "lucide-react";
 import { Complaint, Job } from "../../types";
 import { db, doc, updateDoc } from "../../lib/firebase";
@@ -26,6 +27,40 @@ export default function DisputeTab({
   const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null);
   const [adminResolutionNotes, setAdminResolutionNotes] = useState("");
   const [resolvingId, setResolvingId] = useState<string | null>(null);
+
+  const currentComplaint = complaints.find(c => c.id === selectedComplaint?.id) || selectedComplaint;
+  const [adminChatMessage, setAdminChatMessage] = useState("");
+  const [sendingChat, setSendingChat] = useState(false);
+
+  const handleSendAdminChatMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adminChatMessage.trim() || !currentComplaint) return;
+    setSendingChat(true);
+    try {
+      const cRef = doc(db, "complaints", currentComplaint.id);
+      const comments = [
+        ...(currentComplaint.comments || []),
+        {
+          author: "Welfare Admin Officer",
+          text: adminChatMessage.trim(),
+          timestamp: new Date().toISOString(),
+          role: "admin"
+        }
+      ];
+      await updateDoc(cRef, { comments });
+      await logAction(
+        `Dispute Mediation Message`,
+        "Complaints & Support",
+        `Admin joined and posted a mediation statement to Dispute #${currentComplaint.id.slice(0, 8)}`
+      );
+      setAdminChatMessage("");
+      onRefresh();
+    } catch (err) {
+      console.error("Error sending admin chat:", err);
+    } finally {
+      setSendingChat(false);
+    }
+  };
 
   // AI Quick Resolve States
   const [quickResolveDispute, setQuickResolveDispute] = useState<Complaint | null>(null);
@@ -313,31 +348,31 @@ export default function DisputeTab({
               <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 shadow-2xs space-y-3">
                 <div className="flex justify-between items-center border-b border-slate-200/60 pb-2">
                   <span className="text-[9px] font-black uppercase text-slate-400 tracking-wider font-mono">Incident Registry</span>
-                  <span className="text-xs font-bold text-slate-700 uppercase">Project: {selectedComplaint.jobTitle}</span>
+                  <span className="text-xs font-bold text-slate-700 uppercase">Project: {currentComplaint.jobTitle}</span>
                 </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Worker Testimonial Card */}
-                  <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-2xs relative">
-                    <span className="text-[8px] font-black uppercase tracking-wider px-2 py-0.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded absolute right-3 top-3 font-mono">Worker</span>
-                    <span className="text-[10px] font-bold uppercase text-slate-400 block font-mono">Testifier</span>
-                    <h5 className="font-bold text-slate-900 uppercase text-xs mt-0.5">{selectedComplaint.workerName}</h5>
-                    <p className="text-[11px] text-slate-500 mt-2 italic leading-relaxed">
-                      {selectedComplaint.raisedBy === "worker" ? `"${selectedComplaint.description}"` : "Agreed to daily site duties and check-in rosters."}
-                    </p>
-                  </div>
-
-                  {/* Employer Testimonial Card */}
-                  <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-2xs relative">
-                    <span className="text-[8px] font-black uppercase tracking-wider px-2 py-0.5 bg-indigo-50 border border-indigo-200 text-indigo-800 rounded absolute right-3 top-3 font-mono">Employer</span>
-                    <span className="text-[10px] font-bold uppercase text-slate-400 block font-mono">Testifier</span>
-                    <h5 className="font-bold text-slate-900 uppercase text-xs mt-0.5">{selectedComplaint.employerName}</h5>
-                    <p className="text-[11px] text-slate-500 mt-2 italic leading-relaxed">
-                      {selectedComplaint.raisedBy === "employer" ? `"${selectedComplaint.description}"` : "Required shift delivery checkouts and quality check validations."}
-                    </p>
-                  </div>
-                </div>
-              </div>
+ 
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                   {/* Worker Testimonial Card */}
+                   <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-2xs relative">
+                     <span className="text-[8px] font-black uppercase tracking-wider px-2 py-0.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded absolute right-3 top-3 font-mono">Worker</span>
+                     <span className="text-[10px] font-bold uppercase text-slate-400 block font-mono">Testifier</span>
+                     <h5 className="font-bold text-slate-900 uppercase text-xs mt-0.5">{currentComplaint.workerName}</h5>
+                     <p className="text-[11px] text-slate-500 mt-2 italic leading-relaxed">
+                       {currentComplaint.raisedBy === "worker" ? `"${currentComplaint.description}"` : "Agreed to daily site duties and check-in rosters."}
+                     </p>
+                   </div>
+ 
+                   {/* Employer Testimonial Card */}
+                   <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-2xs relative">
+                     <span className="text-[8px] font-black uppercase tracking-wider px-2 py-0.5 bg-indigo-50 border border-indigo-200 text-indigo-800 rounded absolute right-3 top-3 font-mono">Employer</span>
+                     <span className="text-[10px] font-bold uppercase text-slate-400 block font-mono">Testifier</span>
+                     <h5 className="font-bold text-slate-900 uppercase text-xs mt-0.5">{currentComplaint.employerName}</h5>
+                     <p className="text-[11px] text-slate-500 mt-2 italic leading-relaxed">
+                       {currentComplaint.raisedBy === "employer" ? `"${currentComplaint.description}"` : "Required shift delivery checkouts and quality check validations."}
+                     </p>
+                   </div>
+                 </div>
+               </div>
 
               {/* Gemini AI deep audit control console */}
               <div className="bg-slate-900 border border-slate-950 rounded-xl p-5 text-slate-100 shadow-sm relative overflow-hidden">
@@ -468,6 +503,112 @@ export default function DisputeTab({
                     </div>
                   )}
                 </div>
+              </div>
+
+              {/* Real-Time Mediation Chat Thread */}
+              <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-2xs space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <div className="flex items-center space-x-2">
+                    <MessageSquare className="w-5 h-5 text-slate-800" />
+                    <h3 className="text-xs font-black uppercase text-slate-950 font-mono tracking-tight">
+                      💬 Real-Time Mediation Chat Room
+                    </h3>
+                  </div>
+                  <span className="bg-amber-100 text-amber-900 text-[10px] font-mono font-black px-2.5 py-1 rounded-lg uppercase tracking-wider">
+                    Live Discussion Channel
+                  </span>
+                </div>
+
+                {/* Chat Feed */}
+                <div className="space-y-4 max-h-72 overflow-y-auto p-2 bg-slate-50 rounded-xl border border-slate-100">
+                  {currentComplaint.comments && currentComplaint.comments.length > 0 ? (
+                    currentComplaint.comments.map((comm, idx) => {
+                      const isWorker = comm.role === "worker";
+                      const isAdmin = comm.role === "admin";
+                      const isEmployer = comm.role === "employer" || (!isWorker && !isAdmin);
+
+                      return (
+                        <div
+                          key={idx}
+                          className={`flex flex-col ${
+                            isAdmin ? "items-center" : isEmployer ? "items-end" : "items-start"
+                          }`}
+                        >
+                          <div
+                            className={`max-w-[85%] rounded-2xl p-3.5 shadow-2xs ${
+                              isAdmin
+                                ? "bg-amber-50 border border-amber-200 text-slate-900"
+                                : isEmployer
+                                ? "bg-indigo-600 text-white rounded-tr-none"
+                                : "bg-white border border-slate-200 text-slate-900 rounded-tl-none"
+                            }`}
+                          >
+                            <div className="flex items-center space-x-2 mb-1">
+                              <span
+                                className={`text-[9px] font-black uppercase font-mono px-1.5 py-0.5 rounded ${
+                                  isAdmin
+                                    ? "bg-amber-200 text-amber-900"
+                                    : isEmployer
+                                    ? "bg-indigo-800 text-indigo-100"
+                                    : "bg-emerald-100 text-emerald-800"
+                                }`}
+                              >
+                                {isAdmin ? "Welfare Officer (Admin)" : isEmployer ? "Employer" : "Worker"}
+                              </span>
+                              <span
+                                className={`text-[10px] font-bold ${
+                                  isEmployer ? "text-indigo-200" : "text-slate-500"
+                                }`}
+                              >
+                                {comm.author}
+                              </span>
+                            </div>
+                            <p className="text-xs font-medium leading-relaxed">{comm.text}</p>
+                            <span
+                              className={`text-[9px] block text-right mt-1 font-mono ${
+                                isEmployer ? "text-indigo-200" : "text-slate-400"
+                              }`}
+                            >
+                              {comm.timestamp ? new Date(comm.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Recently"}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="text-center py-10 text-slate-400 text-xs font-mono font-medium">
+                      <Users className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                      No active statements submitted in this dispute thread.
+                      <p className="text-[10px] text-slate-400 mt-1">Workers and employers can post statements in real-time.</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Chat Input */}
+                {currentComplaint.status !== "resolved" ? (
+                  <form onSubmit={handleSendAdminChatMessage} className="flex items-center space-x-2">
+                    <input
+                      type="text"
+                      value={adminChatMessage}
+                      onChange={(e) => setAdminChatMessage(e.target.value)}
+                      placeholder="Write administrative mediation guidance to assist..."
+                      className="flex-1 px-3 py-2 text-xs border border-slate-200 rounded-lg bg-slate-50 text-slate-900 font-semibold focus:outline-none focus:border-slate-800 focus:bg-white transition-all"
+                      required
+                      disabled={sendingChat}
+                    />
+                    <button
+                      type="submit"
+                      disabled={sendingChat || !adminChatMessage.trim()}
+                      className="p-2.5 bg-slate-900 hover:bg-slate-850 text-amber-500 rounded-lg border border-slate-950 cursor-pointer disabled:opacity-55 disabled:cursor-not-allowed transition-all"
+                    >
+                      <Send className="w-4 h-4" />
+                    </button>
+                  </form>
+                ) : (
+                  <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl text-center text-[11px] text-emerald-800 font-bold uppercase font-mono">
+                    ✅ This dispute has been resolved and is closed. Chat history locked.
+                  </div>
+                )}
               </div>
 
               {/* Verdict Logging & Submission Form */}
